@@ -1,19 +1,18 @@
 package ru.yandex.practicum.filmorate.model.validator;
 
-import javax.validation.Constraint;
-import javax.validation.Payload;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import javax.validation.ConstraintValidator;
+import javax.validation.ConstraintValidatorContext;
+import java.time.LocalDate;
 
-//@Documented
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
-@Constraint(validatedBy = FilmClassValidator.class)
-public @interface DateBeforeValidator {
-    String message() default "{Дата релиза не может быть раньше 1895-12-28}";
-    Class<?>[] groups() default {};
-    Class<? extends Payload>[] payload() default {};
+public class DateBeforeValidator implements ConstraintValidator<DateBefore,LocalDate> {
 
+    private final LocalDate dateMin=LocalDate.of(1895,12,28);
+
+    @Override
+    public boolean isValid(LocalDate date, ConstraintValidatorContext cxt) {
+        if(date == null||date.isBefore(dateMin)) {
+            return false;
+        }
+        return  date.toString().matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
 }

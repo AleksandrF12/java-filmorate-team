@@ -1,13 +1,9 @@
 package ru.yandex.practicum.filmorate.controller;
 
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 
 import javax.validation.Valid;
@@ -23,15 +19,13 @@ public class FilmController {
 
     public int maxId = 0;
 
-    @Getter
-    @Setter
     public Map<Integer, Film> films = new HashMap<>(); //информация о фильмах
 
     //добавление фильма
     //валидация добавляемого фильма
     //возвращаем информацию о добавленном фильме в формате json
     @PostMapping
-    protected Film addFilm(@Valid @RequestBody Film film) throws MethodArgumentNotValidException {
+    protected Film addFilm(@Valid @RequestBody Film film){
                 //если валидация прошла успешно, то генерируем id для фильма и добавляем в фильмотеку
                 final int id = generateId();
                 film.setId(id);

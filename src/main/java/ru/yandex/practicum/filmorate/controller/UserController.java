@@ -1,16 +1,12 @@
 package ru.yandex.practicum.filmorate.controller;
 
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 
 import javax.validation.Valid;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,14 +16,9 @@ import java.util.Map;
 @RequestMapping("/users")
 @Slf4j
 public class UserController {
-    private final LocalDate MIN_BIRTHDAY = LocalDate.now();
-    private final short MIN_MAIL_LENGTH = 6;
-    private final short MIN_MAIL_POSITION = 0;
 
     public int maxId = 0;
 
-    @Getter
-    @Setter
     public Map<Integer, User> users = new HashMap<>(); //информация о фильмах
 
     //добавление пользователя

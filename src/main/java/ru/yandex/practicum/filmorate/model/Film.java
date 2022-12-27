@@ -2,7 +2,7 @@ package ru.yandex.practicum.filmorate.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import ru.yandex.practicum.filmorate.model.validator.DateBeforeValidator;
+import ru.yandex.practicum.filmorate.model.validator.DateBefore;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Positive;
@@ -22,7 +22,7 @@ public class Film {
     @Size(max = 200)
     private String description; //описание
 
-    @DateBeforeValidator
+    @DateBefore
     private LocalDate releaseDate; //дата релиза
 
     @Positive
