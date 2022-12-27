@@ -21,8 +21,6 @@ import java.util.Map;
 @Slf4j
 public class FilmController {
 
-    @Getter
-    @Setter
     public int maxId = 0;
 
     @Getter
@@ -49,7 +47,7 @@ public class FilmController {
     //возвращаем информацию об обновлённом фильме в формате json
     @PutMapping
     protected Film updateFilm(@Valid @RequestBody Film film) {
-        try {
+//        try {
             //валидация добавляемого фильма, если не проходит, то возвращаем на сервер сообщение о некорректных данных
             if (this.films.containsKey(film.getId())) {
                 this.films.put(film.getId(), film);
@@ -59,11 +57,8 @@ public class FilmController {
             } else {
                 log.warn("Фильм не обновлён, неверный формат: с id={}, name={}, description={}, releaseDate={}, duration={}"
                         , film.getName(), film.getDescription(), film.getReleaseDate(), film.getDuration());
-                throw new ValidationException("Ошибка обновления фильма!");
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Фильма с таким id нет.");
             }
-        } catch (ValidationException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, exception.getMessage());
-        }
     }
 
     //возвращает информацию обо всех фильмах
@@ -75,7 +70,6 @@ public class FilmController {
 
     //генерация очередного id фильма
     private int generateId() {
-        setMaxId(getMaxId() + 1);
-        return getMaxId();
+        return ++maxId;
     }
 }

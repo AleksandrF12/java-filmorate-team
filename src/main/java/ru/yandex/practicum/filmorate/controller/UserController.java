@@ -24,8 +24,6 @@ public class UserController {
     private final short MIN_MAIL_LENGTH = 6;
     private final short MIN_MAIL_POSITION = 0;
 
-    @Getter
-    @Setter
     public int maxId = 0;
 
     @Getter
@@ -53,7 +51,6 @@ public class UserController {
     //обновление пользователя
     @PutMapping
     private User updateUser(@Valid @RequestBody User user) {
-        try {
         //валидация добавляемого фильма, если не проходит, то возвращаем на сервер сообщение о некорректных данных
             if (this.users.containsKey(user.getId())) {
                 String name = user.getName();
@@ -66,13 +63,11 @@ public class UserController {
                         , user.getId(), user.getName(), user.getEmail(), user.getLogin(), user.getBirthday());
                 return user;
             } else {
-                log.warn("Данные пользователя не обновлены, неверный формат (данные): с id={}, name={}, email={}, login={}, birthday={}"
+                log.warn("Данные пользователя не обновлены, неверный формат (данные): с id={}" +
+                                ", name={}, email={}, login={}, birthday={}"
                         , user.getId(), user.getName(), user.getEmail(), user.getLogin(), user.getBirthday());
-                throw new ValidationException("Ошибка добавления пользователя!");
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Пользователя с таким id нет.");
             }
-        } catch (ValidationException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, exception.getMessage());
-        }
     }
 
     //возвращает информацию обо всех фильмах
@@ -85,7 +80,6 @@ public class UserController {
 
     //генерация очередного id фильма
     private int generateId() {
-        setMaxId(getMaxId() + 1);
-        return getMaxId();
+        return ++maxId;
     }
 }

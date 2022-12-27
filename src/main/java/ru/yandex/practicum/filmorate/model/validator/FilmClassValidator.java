@@ -4,7 +4,7 @@ import javax.validation.ConstraintValidator;
 import javax.validation.ConstraintValidatorContext;
 import java.time.LocalDate;
 
-public class FilmClassValidator implements ConstraintValidator<DateBefore,LocalDate> {
+public class FilmClassValidator implements ConstraintValidator<DateBeforeValidator,LocalDate> {
 
     private final LocalDate dateMin=LocalDate.of(1895,12,28);
 

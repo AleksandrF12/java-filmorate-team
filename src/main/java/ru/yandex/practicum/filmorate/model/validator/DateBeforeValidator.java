@@ -11,7 +11,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.FIELD)
 @Constraint(validatedBy = FilmClassValidator.class)
-public @interface DateBefore {
+public @interface DateBeforeValidator {
     String message() default "{Дата релиза не может быть раньше 1895-12-28}";
     Class<?>[] groups() default {};
     Class<? extends Payload>[] payload() default {};
