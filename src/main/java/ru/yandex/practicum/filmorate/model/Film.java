@@ -9,12 +9,13 @@ import javax.validation.constraints.Positive;
 import javax.validation.constraints.PositiveOrZero;
 import javax.validation.constraints.Size;
 import java.time.LocalDate;
+import java.util.Set;
 
 @Data
 @AllArgsConstructor
 //генерирует @Getter,@Setter,@ToString,@EqualsAndHashCode,@RequiredArgsConstructor
 public class Film {
-    private int id; //целочисленный идентификатор
+    private long id; //целочисленный идентификатор
 
     @NotBlank
     private String name; //название
@@ -30,4 +31,6 @@ public class Film {
 
     @PositiveOrZero
     private int rate; //рейтинг фильма
+
+    private Set<Long> like; //лайки, поставленный пользователями,содержит id пользователя
 }
