@@ -13,10 +13,21 @@ import java.util.stream.Collectors;
 @Slf4j
 public class UserService {
 
-    InMemoryUserStorage inMemoryUserStorage;
+    private final InMemoryUserStorage inMemoryUserStorage;
 
     public UserService(InMemoryUserStorage inMemoryUserStorage) {
         this.inMemoryUserStorage = inMemoryUserStorage;
+    }
+
+    //добавление пользователя
+    public User addUser(User user) {
+        return inMemoryUserStorage.addUser(user);
+    }
+
+    //обновление пользователя
+    public User updateUser(User user) {
+        isValidIdUser(user.getId());
+        return inMemoryUserStorage.updateUser(user);
     }
 
     //возвращает информацию обо всех пользователях
@@ -27,18 +38,20 @@ public class UserService {
     //получение данных о пользователе
     public User getUser(long userId) {
         log.info("Получен запрос на получение данных пользователя с id={}", userId);
+        isValidIdUser(userId);
+        log.info("Пользователь с id={} получен.", userId);
         return inMemoryUserStorage.getUser(userId);
     }
 
     //добавление в друзья
     public void addFriend(long userId, long friendId) {
-        if (isValidIdUser(userId) && isValidIdUser(friendId)) {
-            log.debug("Получен запрос на добавление для пользователя с id={} друга с id={}", userId, friendId);
-            //взаимно добавляем друзей в списки
-            addFriendsInUser(userId, friendId);
-            addFriendsInUser(friendId, userId);
-            log.info("Для пользователя с id = {} добавлен друг с id={}", userId, friendId);
-        }
+        isValidIdUser(userId);
+        isValidIdUser(friendId);
+        log.debug("Получен запрос на добавление для пользователя с id={} друга с id={}", userId, friendId);
+        //взаимно добавляем друзей в списки
+        addFriendsInUser(userId, friendId);
+        addFriendsInUser(friendId, userId);
+        log.info("Для пользователя с id = {} добавлен друг с id={}", userId, friendId);
     }
 
     //обновляет список друзей
@@ -59,42 +72,42 @@ public class UserService {
     //удаление из друзей
     public void deleteFriend(long userId, long friendId) {
         log.debug("Получен запрос на удаление для пользователя с id={} друга с id={}", userId, friendId);
-        if (isValidIdUser(userId) && isValidIdUser(friendId) && !isEqualIdUser(userId, friendId)) {
-            log.debug("Запрос на удаление для пользователя с id={} друга с id={} одобрен.", userId, friendId);
-            Optional<Set<Long>> friendsOp = Optional.ofNullable(inMemoryUserStorage.getUser(userId).getFriends());
-            if (friendsOp.isPresent() && friendsOp.get().contains(friendId)) {
-                Set<Long> friends = friendsOp.get();
-                friends.remove(friendId);
-                log.info("У пользователя с id = {} удалён друг с id={}", userId, friendId);
-            }
+        isValidIdUser(userId);
+        isValidIdUser(friendId);
+        isNotEqualIdUser(userId, friendId);
+        log.debug("Запрос на удаление для пользователя с id={} друга с id={} одобрен.", userId, friendId);
+        Optional<Set<Long>> friendsOp = Optional.ofNullable(inMemoryUserStorage.getUser(userId).getFriends());
+        if (friendsOp.isPresent() && friendsOp.get().contains(friendId)) {
+            Set<Long> friends = friendsOp.get();
+            friends.remove(friendId);
+            log.info("У пользователя с id = {} удалён друг с id={}", userId, friendId);
         }
     }
 
     //возвращение списка друзей пользователя
     public List<User> getFriends(long userId) {
         log.debug("Получен запрос на получение для пользователя с id={} списка друзей", userId);
-        if (isValidIdUser(userId)) {
-            return inMemoryUserStorage.getUser(userId).getFriends().stream()
-                    .map(inMemoryUserStorage::getUser)
-                    .collect(Collectors.toList());
-        }
-        return new ArrayList<>();
+        isValidIdUser(userId);
+        return inMemoryUserStorage.getUser(userId).getFriends().stream()
+                .map(inMemoryUserStorage::getUser)
+                .collect(Collectors.toList());
     }
 
 
     //список друзей, общих с другим пользователем.
     public List<User> getOtherFriends(long userId, long otherId) {
         log.debug("Получен запрос на поиск общих друзей для пользователей с userId={} и otherId={}.", userId, otherId);
-        if (isValidIdUser(userId) && isValidIdUser(otherId) && !isEqualIdUser(userId, otherId)) {
-            log.debug("Запрос на поиск общих друзей для пользователей с userId={} и otherId={} одобрен.", userId, otherId);
-            Optional<Set<Long>> userFriendsOp = Optional.ofNullable(inMemoryUserStorage.getUser(userId).getFriends());
-            Optional<Set<Long>> otherFriendsOp = Optional.ofNullable(inMemoryUserStorage.getUser(otherId).getFriends());
-            if (userFriendsOp.isPresent() && otherFriendsOp.isPresent()) {
-                Set<Long> userFriends = userFriendsOp.get();
-                Set<Long> otherFriends = otherFriendsOp.get();
-                return userFriends.stream().filter(otherFriends::contains).map(inMemoryUserStorage::getUser)
-                        .collect(Collectors.toList());
-            }
+        isValidIdUser(userId);
+        isValidIdUser(otherId);
+        isNotEqualIdUser(userId, otherId);
+        log.debug("Запрос на поиск общих друзей для пользователей с userId={} и otherId={} одобрен.", userId, otherId);
+        Optional<Set<Long>> userFriendsOp = Optional.ofNullable(inMemoryUserStorage.getUser(userId).getFriends());
+        Optional<Set<Long>> otherFriendsOp = Optional.ofNullable(inMemoryUserStorage.getUser(otherId).getFriends());
+        if (userFriendsOp.isPresent() && otherFriendsOp.isPresent()) {
+            Set<Long> userFriends = userFriendsOp.get();
+            Set<Long> otherFriends = otherFriendsOp.get();
+            return userFriends.stream().filter(otherFriends::contains).map(inMemoryUserStorage::getUser)
+                    .collect(Collectors.toList());
         }
         return new ArrayList<>();
     }
@@ -107,14 +120,15 @@ public class UserService {
         if (!user.isPresent()) {
             throw new UserNotFoundException("Пользователь с id=" + userId + " не найден.");
         }
+        log.debug("Валидация пользователя с id={} прошла успешно.", userId);
         return true;
     }
 
     //проверяет не равныли id пользователя и друга
-    private boolean isEqualIdUser(long userId, long friendId) {
+    private boolean isNotEqualIdUser(long userId, long friendId) {
         if (userId == friendId) {
             throw new UserNotFoundException("Пользователь с id=" + userId + " не может добавить сам себя в друзья.");
         }
-        return false;
+        return true;
     }
 }

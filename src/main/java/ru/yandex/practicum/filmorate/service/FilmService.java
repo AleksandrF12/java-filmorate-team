@@ -22,8 +22,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class FilmService {
 
-    InMemoryUserStorage inMemoryUserStorage;
-    InMemoryFilmStorage inMemoryFilmStorage;
+    private final InMemoryUserStorage inMemoryUserStorage;
+    private final InMemoryFilmStorage inMemoryFilmStorage;
 
     public FilmService(InMemoryUserStorage inMemoryUserStorage, InMemoryFilmStorage inMemoryFilmStorage) {
         this.inMemoryUserStorage = inMemoryUserStorage;
@@ -37,17 +37,20 @@ public class FilmService {
 
     //обновляем фильм
     public Film updateFilm(Film film) {
+        isValidFilmId(film.getId());
         return inMemoryFilmStorage.updateFilm(film);
     }
 
     //удаление фильма по id
     public void deleteFilm(long filmId) {
+        isValidFilmId(filmId);
         inMemoryFilmStorage.deleteFilm(filmId);
     }
 
     //получение фильма по id
     public Film getFilm(long filmId) {
         log.info("GET Запрос на поиск фильма с id={}", filmId);
+        isValidFilmId(filmId);
         return inMemoryFilmStorage.getFilm(filmId);
     }
 
@@ -61,18 +64,18 @@ public class FilmService {
         //проверка корректности значений filmId,userId
         //проверка существования фильма: наличие в списке фильмов и пользователей
         log.debug("Запрос на добавление фильму с id={} лайка от пользователя с userId={}", filmId, userId);
-        if (isValidFilmId(filmId) && isValidUserId(userId)) {
-            Optional<Film> filmOpt = Optional.ofNullable(inMemoryFilmStorage.getFilm(filmId));
-            log.debug("Получен фильм: " + filmOpt);
-            if (filmOpt.isPresent()) {
-                Film film = filmOpt.get();
-                Set<Long> likeNew = film.getLike();
-                likeNew.add(userId);
-                film.setLike(likeNew);
-                log.info("Фильму с filmId={} добавлен лайк от пользователя с id={}.", filmId, userId);
-            } else {
-                throw new UserNotFoundException("Пользователь с id=" + userId + " не найден.");
-            }
+        isValidFilmId(filmId);
+        isValidUserId(userId);
+        Optional<Film> filmOpt = Optional.ofNullable(inMemoryFilmStorage.getFilm(filmId));
+        log.debug("Получен фильм: " + filmOpt);
+        if (filmOpt.isPresent()) {
+            Film film = filmOpt.get();
+            Set<Long> likeNew = film.getLike();
+            likeNew.add(userId);
+            film.setLike(likeNew);
+            log.info("Фильму с filmId={} добавлен лайк от пользователя с id={}.", filmId, userId);
+        } else {
+            throw new UserNotFoundException("Пользователь с id=" + userId + " не найден.");
         }
     }
 
@@ -83,21 +86,21 @@ public class FilmService {
         //проверка существования пользователя: наличие в списке пользователей
         //проверка существования фильма с filmId и пользователя с userId
         log.debug("Запрос на удаление лайка фильму с id={} лайка от пользователя с userId={}", filmId, userId);
-        if (isValidFilmId(filmId) && isValidUserId(userId)) {
-            Optional<Film> filmOpt = Optional.ofNullable(inMemoryFilmStorage.getFilm(filmId));
-            log.debug("Получен фильм: " + filmOpt);
-            if (filmOpt.isPresent()) {
-                //получаем текущее количество лайков у фильма
-                Film film = filmOpt.get();
-                Set<Long> filmLike = film.getLike();
-                if (!filmLike.isEmpty() && filmLike.contains(userId)) {
-                    filmLike.remove(userId);
-                    film.setLike(filmLike);
-                    log.debug("Лайк фильма с filmId={} для пользователя userId={} удалён.", filmId, userId);
-                }
-            } else {
-                throw new UserNotFoundException("Пользователь с id=" + userId + " не найден.");
+        isValidFilmId(filmId);
+        isValidUserId(userId);
+        Optional<Film> filmOpt = Optional.ofNullable(inMemoryFilmStorage.getFilm(filmId));
+        log.debug("Получен фильм: " + filmOpt);
+        if (filmOpt.isPresent()) {
+            //получаем текущее количество лайков у фильма
+            Film film = filmOpt.get();
+            Set<Long> filmLike = film.getLike();
+            if (!filmLike.isEmpty() && filmLike.contains(userId)) {
+                filmLike.remove(userId);
+                film.setLike(filmLike);
+                log.debug("Лайк фильма с filmId={} для пользователя userId={} удалён.", filmId, userId);
             }
+        } else {
+            throw new UserNotFoundException("Пользователь с id=" + userId + " не найден.");
         }
     }
 

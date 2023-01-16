@@ -24,7 +24,6 @@ public class InMemoryFilmStorage implements FilmStorage {
 
     @Override
     public Film addFilm(Film film) {
-        //если валидация прошла успешно, то генерируем id для фильма и добавляем в фильмотеку
         final long id = generateId();
         film.setId(id);
         film.setLike(new HashSet<>());
@@ -36,8 +35,7 @@ public class InMemoryFilmStorage implements FilmStorage {
 
     @Override
     public Film updateFilm(Film film) {
-        //валидация добавляемого фильма, если не проходит, то возвращаем на сервер сообщение о некорректных данных
-        long filmId=film.getId();
+        long filmId = film.getId();
         if (this.films.containsKey(filmId)) {
             Film filmNew = films.get(filmId);
             if (filmNew.getLike().isEmpty()) {
@@ -47,16 +45,14 @@ public class InMemoryFilmStorage implements FilmStorage {
             log.info("Фильм обновлён : {}", this.films.get(filmId));
             return film;
         }
-        throw new FilmNotFoundException("Фильм с id="+filmId+" не найден.");
+        throw new FilmNotFoundException("Фильм с id=" + filmId + " не найден.");
     }
 
     //удаление фильма
     @Override
     public void deleteFilm(long filmId) {
-        if (isValidIdFilm(filmId)) {
-            films.remove(filmId);
-            log.info("Фильм с id={} удалён.", filmId);
-        }
+        films.remove(filmId);
+        log.info("Фильм с id={} удалён.", filmId);
     }
 
     //возвращает список всех фильмов
@@ -68,14 +64,8 @@ public class InMemoryFilmStorage implements FilmStorage {
     //получение фильма по id
     @Override
     public Film getFilm(long filmId) {
-        //проверка корректности значений filmId,userId : null, меньше 0
-        //проверка существования фильма: наличие в списке фильмов
-        //проверка существования пользователя: наличие в списке пользователей
         log.debug("Запрошен фильм с id={}", filmId);
-        if (isValidIdFilm(filmId)) {
-            return this.films.get(filmId);
-        }
-        throw new FilmNotFoundException("Фильм с id="+filmId+" не найден.");
+        return this.films.get(filmId);
     }
 
     //генерация очередного id фильма
@@ -83,22 +73,4 @@ public class InMemoryFilmStorage implements FilmStorage {
         return ++maxId;
     }
 
-    //проверка корректности значений filmId
-    private boolean isValidIdFilm(long filmId) {
-        if (filmId <= 0) {
-            throw new FilmNotFoundException("Некорректный id фильма.");
-        }
-        //проверка существования фильма userId : наличие в списке фильмов
-        if (!films.containsKey(filmId)) {
-            throw new FilmNotFoundException("Фильм с id=" + filmId + " не найден.");
-        }
-        return true;
-    }
-
-    //метод для тестирования
-    //удаление всей фильмотеки
-    public void clear() {
-        this.films.clear();
-        this.maxId = 0;
-    }
 }
