@@ -7,13 +7,15 @@ import javax.validation.constraints.Email;
 import javax.validation.constraints.PastOrPresent;
 import javax.validation.constraints.Pattern;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 
 @Data
 @AllArgsConstructor
 //генерирует @Getter,@Setter,@ToString,@EqualsAndHashCode,@RequiredArgsConstructor
 public class User {
 
-        private int id; //целочисленный идентификатор
+        private long id; //целочисленный идентификатор
 
         @Email
         private String email; //электронная почта
@@ -25,4 +27,7 @@ public class User {
 
         @PastOrPresent
         private LocalDate birthday; //дата рождения
+
+        private Set<Long> friends=new HashSet<>(); //друзья пользователя
+
 }
