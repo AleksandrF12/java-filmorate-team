@@ -1,4 +1,4 @@
-package ru.yandex.practicum.filmorate.storage.film;
+package ru.yandex.practicum.filmorate.storage.film.dao;
 
 import ru.yandex.practicum.filmorate.model.Film;
 
@@ -19,5 +19,5 @@ public interface FilmStorage {
 
     Film getFilm(long filmId);
     List<Film> getFilms();
-
+    List<Film> getPopularFilms(long maxCount);
 }

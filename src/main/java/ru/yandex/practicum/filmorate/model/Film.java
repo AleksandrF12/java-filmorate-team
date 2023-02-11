@@ -29,8 +29,18 @@ public class Film {
     @Positive
     private int duration; //продолжительность фильма
 
-    @PositiveOrZero
-    private int rate; //рейтинг фильма
+//    @PositiveOrZero
+    private int rate;
 
-    private Set<Long> like; //лайки, поставленный пользователями,содержит id пользователя
+    private MPA mpa; //рейтинг фильма
+
+    private Set<Genre> genres; //жанр фильма
+
+    public Set<Genre> getGenres() {
+        return genres;
+    }
+
+    public void setGenres(Set<Genre> genres) {
+        this.genres = genres;
+    }
 }
