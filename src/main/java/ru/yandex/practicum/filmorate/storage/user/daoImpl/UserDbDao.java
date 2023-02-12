@@ -10,7 +10,7 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.exceptions.user.UserNotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
-import ru.yandex.practicum.filmorate.storage.user.dao.UserStorage;
+import ru.yandex.practicum.filmorate.storage.user.dao.UserDao;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -21,13 +21,13 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
-@Qualifier("userDbStorage")
+@Qualifier("userDbDao")
 @Primary
 @Slf4j
-public class UserDbStorage implements UserStorage {
+public class UserDbDao implements UserDao {
     private final JdbcTemplate jdbcTemplate;
 
-    public UserDbStorage(JdbcTemplate jdbcTemplate) {
+    public UserDbDao(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 

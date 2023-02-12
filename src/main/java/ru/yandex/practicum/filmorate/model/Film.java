@@ -6,7 +6,6 @@ import ru.yandex.practicum.filmorate.model.validator.DateBefore;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Positive;
-import javax.validation.constraints.PositiveOrZero;
 import javax.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.Set;
@@ -29,7 +28,6 @@ public class Film {
     @Positive
     private int duration; //продолжительность фильма
 
-//    @PositiveOrZero
     private int rate;
 
     private MPA mpa; //рейтинг фильма
@@ -42,5 +40,9 @@ public class Film {
 
     public void setGenres(Set<Genre> genres) {
         this.genres = genres;
+    }
+
+    public void addGenres(Genre genre) {
+        this.genres.add(genre);
     }
 }

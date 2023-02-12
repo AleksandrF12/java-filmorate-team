@@ -10,7 +10,7 @@ import java.util.List;
 @Service
 @Slf4j
 public class GenreService {
-        private final GenreDao genreDao;
+    private final GenreDao genreDao;
 
     public GenreService(GenreDao genreDao) {
         this.genreDao = genreDao;
@@ -18,7 +18,7 @@ public class GenreService {
 
     //возвращает информацию обо всех рейтингах MPA
     public List<Genre> getGenres() {
-        return genreDao.getGenres();
+        return genreDao.getGenresFilms();
     }
 
     public Genre getGenre(int genreId) {

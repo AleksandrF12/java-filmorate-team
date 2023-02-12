@@ -1,6 +1,7 @@
 package ru.yandex.practicum.filmorate.storage.film.daoImpl;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.exceptions.genre.GenreNotFoundException;
@@ -12,19 +13,20 @@ import java.sql.SQLException;
 import java.util.List;
 
 
-@Component
+@Component("genreDbDao")
+@Primary
 @Slf4j
-public class GenreDbStorage implements GenreDao {
+public class GenreDbDao implements GenreDao {
     private final JdbcTemplate jdbcTemplate;
 
-    public GenreDbStorage(JdbcTemplate jdbcTemplate) {
+    public GenreDbDao(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
     public Genre getGenge(int id) {
         log.debug("Получен запрос на поиск жанра с id={}", id);
-        String getGenreSql = "select genre_id,genre_name from genre where genre_id = ?";
+        String getGenreSql = "select genre_id,genre_name from genre where genre_id = ?;";
         Genre genre = jdbcTemplate.query(getGenreSql, (rs, rowNum) -> genreMapper(rs), id).stream().findAny().orElse(null);
         if (genre == null) {
             log.debug("Жанр с id={} не найден.", id);
@@ -44,10 +46,10 @@ public class GenreDbStorage implements GenreDao {
     }
 
     @Override
-    public List<Genre> getGenres() {
+    public List<Genre> getGenresFilms() {
         try {
             log.debug("Получен запрос на чтение всех жанров.");
-            String getGenreSql = "select genre_id,genre_name from genre";
+            String getGenreSql = "select genre_id,genre_name from genre order by genre_id;";
             List<Genre> genres = jdbcTemplate.query(getGenreSql, (rs, rowNum) -> genreMapper(rs));
             return genres;
         } catch (Throwable e) {

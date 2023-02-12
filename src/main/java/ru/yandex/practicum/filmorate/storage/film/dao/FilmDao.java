@@ -6,7 +6,7 @@ import java.util.List;
 
 //методы добавления, удаления и модификации объектов.
 
-public interface FilmStorage {
+public interface FilmDao {
 
     //добавление фильма
     Film addFilm(Film film);

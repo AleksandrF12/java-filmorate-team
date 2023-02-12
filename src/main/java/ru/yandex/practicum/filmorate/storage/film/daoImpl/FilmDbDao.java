@@ -8,12 +8,11 @@ import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
-import ru.yandex.practicum.filmorate.exceptions.ValidationException;
 import ru.yandex.practicum.filmorate.exceptions.film.FilmNotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.MPA;
-import ru.yandex.practicum.filmorate.storage.film.dao.FilmStorage;
+import ru.yandex.practicum.filmorate.storage.film.dao.FilmDao;
 import ru.yandex.practicum.filmorate.storage.film.dao.GenreDao;
 import ru.yandex.practicum.filmorate.storage.film.dao.MpaDao;
 
@@ -22,20 +21,19 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
-@Component
-@Qualifier("filmDbStorage")
+@Component("filmDbStorage")
 @Primary
 @Slf4j
-public class FilmDbStorage implements FilmStorage {
+public class FilmDbDao implements FilmDao {
     private final JdbcTemplate jdbcTemplate;
     private final MpaDao mpaDao;
     private final GenreDao genreDao;
 
-    public FilmDbStorage(JdbcTemplate jdbcTemplate, MpaDao mpaDao, GenreDao genreDao) {
+    public FilmDbDao(JdbcTemplate jdbcTemplate, @Qualifier("mpaDbDao") MpaDao mpaDao,
+                     @Qualifier("genreDbDao") GenreDao genreDao) {
         this.jdbcTemplate = jdbcTemplate;
         this.mpaDao = mpaDao;
         this.genreDao = genreDao;
@@ -44,18 +42,6 @@ public class FilmDbStorage implements FilmStorage {
     @Override
     public Film addFilm(Film film) {
         log.info("Запрос на добавление фильма: {} получен хранилищем БД", film.getName());
-
-        //проверка наличия рейтинга в таблице ratings (MPA)
-        if (!isRatingsMpa(film.getMpa().getId())) {
-            throw new ValidationException("Не найден рейтинг фильма с id=" + film.getMpa().getId());
-        }
-
-        //проверка наличия жанра в таблице genres
-        if (film.getGenres() != null && !film.getGenres().isEmpty()) {
-            if (!isGenres(film.getGenres())) {
-                throw new ValidationException("Для обновляемого фильма не найдены все жанры.");
-            }
-        }
 
         //добавить информацию о фильме в таблицу films
         String addFilmSql = "INSERT INTO films(name,description,release_date,duration,rate,rating_id) VALUES(?,?,?,?,?,?);";
@@ -81,12 +67,14 @@ public class FilmDbStorage implements FilmStorage {
 
         //если все жанры найдены в БД, то добавляем записи о жанрах в таблицу films_genre
         if (film.getGenres() != null && !film.getGenres().isEmpty()) {
-            Set<Integer> genres=film.getGenres().stream()
+            log.debug("Добавляем жанры вновь создаваемому фильму с id={}.", filmId);
+            Set<Integer> genres = film.getGenres().stream()
                     .map(Genre::getId)
                     .collect(Collectors.toSet());
             for (int gr : genres) {
                 genreDao.addFilmGenre(film.getId(), gr);
             }
+            log.debug("Жанры для фильма с id={} добавлены.", filmId);
         }
         return getFilm(film.getId());
     }
@@ -97,19 +85,6 @@ public class FilmDbStorage implements FilmStorage {
     //обновляем поля таблицы films_genre:film_id, genre_id - удаляем и перезаписываем
     public Film updateFilm(Film film) {
         log.info("Получен запрос на обновление фильма с id={} в БД", film.getId());
-        //проверка наличия рейтинга в таблице ratings (MPA)
-        //если он задан
-        if (!isRatingsMpa(film.getMpa().getId())) {
-            throw new ValidationException("Не найден рейтинг фильма с id=" + film.getMpa().getId());
-        }
-
-        //поиск жанра в таблице genres
-        //если получено пустое поле с жанрами, то игнорируем проверку
-        if (film.getGenres() != null && !film.getGenres().isEmpty()) {
-            if (!isGenres(film.getGenres())) {
-                throw new ValidationException("Для обновляемого фильма не найдены все жанры.");
-            }
-        }
 
         //обновляем данные в таблице films
         log.debug("Формируем sql запрос...");
@@ -127,13 +102,16 @@ public class FilmDbStorage implements FilmStorage {
         //если все жанры найдены в БД, то сначала удаляем записи из films_genre
         // потом добавляем записи о жанрах в таблицу films_genre
         genreDao.delFilmGenre(film.getId());
+        log.debug("Обновляем жанры фильма с film_id={}, жанры: {}", film.getId(), film.getGenres());
         if (film.getGenres() != null && !film.getGenres().isEmpty()) {
-            Set<Integer> genres=film.getGenres().stream()
-                                                .map(Genre::getId)
-                                                .collect(Collectors.toSet());
+            Set<Integer> genres = film.getGenres().stream()
+                    .map(Genre::getId)
+                    .collect(Collectors.toSet());
+            log.debug("id жанров для обновления: {}", genres.toString());
             for (int gr : genres) {
                 genreDao.addFilmGenre(film.getId(), gr);
             }
+            log.debug("Жанры фильма с film_id={} обновлены.", film.getId());
         }
         return getFilm(film.getId());
     }
@@ -158,35 +136,65 @@ public class FilmDbStorage implements FilmStorage {
     //из таблицы ratings_mpa: mpa.id,mpa.name
     public Film getFilm(long filmId) {
         log.debug("Получен запрос на фильм с id={};", filmId);
-        String getFilmSql = "select * from films where film_id=?";
-        Film film = jdbcTemplate.query(getFilmSql, (rs, rowNum) -> filmMapper(rs), filmId).stream().findAny().orElse(null);
-        if (film == null) {
+        String getFilmSql = "select f.FILM_ID,f.NAME,f.DESCRIPTION,f.RELEASE_DATE,f.RELEASE_DATE,f.DURATION,f.RATE," +
+                "rm.RATING_ID,rm.RATING_NAME,g.GENRE_ID,g.GENRE_NAME from (SELECT * FROM films WHERE film_id=?) f " +
+                "LEFT JOIN RATINGS_MPA rm " +
+                "ON f.RATING_ID =rm.RATING_ID LEFT JOIN FILMS_GENRE fg ON f.FILM_ID =fg.FILM_ID LEFT JOIN GENRE g " +
+                "ON fg.GENRE_ID =g.GENRE_ID ORDER BY f.FILM_ID; ";
+        List<Film> films = jdbcTemplate.query(getFilmSql, (rs, rowNum) -> filmMapper(rs), filmId);
+        //перебираем films, убираем дубли и группируем жанры
+        Optional<Film> film = getUniqueFilm(films).values().stream().findFirst();
+        if (!film.isPresent()) {
             log.debug("С id={} фильм не найден.", filmId);
-            throw new FilmNotFoundException("С id="+filmId+" фильм не найден.");
+            throw new FilmNotFoundException("С id=" + filmId + " фильм не найден.");
         }
-        log.debug("С id={} возвращён фильм: {}", filmId, film.getName());
-        return film;
+        log.debug("С id={} возвращён фильм: {}", filmId, films.stream().findFirst().get().getName());
+        return film.get();
     }
 
     @Override
     public List<Film> getFilms() {
         log.debug("Получен запрос на чтение всех фильмов");
-        String getFilmSql = "select * from films;";
+        String getFilmSql = "select f.FILM_ID ,f.NAME ,f.DESCRIPTION ,f.RELEASE_DATE ,f.RELEASE_DATE ,f.DURATION ,f.RATE ," +
+                "rm.RATING_ID ,rm.RATING_NAME ,g.GENRE_ID ,g.GENRE_NAME from films f LEFT JOIN RATINGS_MPA rm " +
+                "ON f.RATING_ID =rm.RATING_ID LEFT JOIN FILMS_GENRE fg ON f.FILM_ID =fg.FILM_ID LEFT JOIN GENRE g " +
+                "ON fg.GENRE_ID =g.GENRE_ID ORDER BY f.FILM_ID;";
+        //запрашиваем все фильмы с жанрами и рейтингом MPA
         List<Film> films = jdbcTemplate.query(getFilmSql, (rs, rowNum) -> filmMapper(rs));
         if (films == null) {
             log.debug("Фильмы не найдены.");
             throw new FilmNotFoundException("Фильмы не найдены.");
         }
-        log.debug("Найдено фильмов: {} шт.", films.size());
-        return films;
+        log.debug("Получен списко из {} фильмов.", films.size());
+        //если у фильма несколько жанров, то будут дубли
+        //перебираем получившийся набор, если дубль, то добавляем в Set<Genre> ещё один жанр
+        //long - film_id
+        //Film - информация о фильме
+        //перебираем films, убираем дубли и группируем жанры
+        LinkedHashMap<Long, Film> filmsMap = getUniqueFilm(films);
+        log.debug("После удаления дублей осталось {} фильмов.", filmsMap.size());
+        return filmsMap.values().stream().collect(Collectors.toList());
     }
 
     @Override
     public List<Film> getPopularFilms(long maxCount) {
-        String popFilmSql="SELECT f.* FROM FILMS f LEFT JOIN (SELECT FILM_ID,COUNT(*) cLike FROM FILMS_LIKE GROUP BY FILM_ID) fl" +
-                " ON fl.FILM_ID=f.FILM_ID ORDER BY fl.cLike DESC LIMIT (?);";
-        return jdbcTemplate.query(popFilmSql, (rs, rowNum) -> filmMapper(rs),maxCount);
+        String popFilmSql = "SELECT f2.FILM_ID ,f2.NAME ,f2.DESCRIPTION ,f2.RELEASE_DATE ,f2.RELEASE_DATE ,f2.DURATION ,f2.RATE," +
+                "rm.RATING_ID ,rm.RATING_NAME ,g.GENRE_ID ,g.GENRE_NAME FROM (SELECT f.* FROM FILMS f LEFT JOIN " +
+                "(SELECT FILM_ID,COUNT(*) cLike FROM FILMS_LIKE GROUP BY FILM_ID ) fl ON fl.FILM_ID=f.FILM_ID " +
+                "ORDER BY clike DESC limit(?)) f2 " +
+                "LEFT JOIN RATINGS_MPA rm ON f2.RATING_ID =rm.RATING_ID " +
+                "LEFT JOIN FILMS_GENRE fg ON f2.FILM_ID =fg.FILM_ID " +
+                "LEFT JOIN GENRE g ON fg.GENRE_ID =g.GENRE_ID;";
+        List<Film> popFilms = jdbcTemplate.query(popFilmSql, (rs, rowNum) -> filmMapper(rs), maxCount);
+        log.debug("Популярные фильмы:");
+        for (Film film : popFilms) {
+            log.debug("Фильм с film_id={}: {}", film.getId(), film);
+        }
+        //перебираем films, убираем дубли и группируем жанры
+        LinkedHashMap<Long, Film> filmsMap = getUniqueFilm(popFilms);
+        return filmsMap.values().stream().collect(Collectors.toList());
     }
+
     private Film filmMapper(ResultSet rs) throws SQLException {
         //перебираем записи результирующего набора
         long id = rs.getLong("film_id");
@@ -197,37 +205,25 @@ public class FilmDbStorage implements FilmStorage {
         int rate = rs.getInt("rate");
         MPA mpa = new MPA();
         mpa.setId(rs.getInt("rating_id"));
-        //запрос в таблицу rating_mpa
-        MPA ratingMpa = mpaDao.getRating(mpa.getId());
-        if (ratingMpa != null) {
-            mpa.setName(ratingMpa.getName());
+        mpa.setName(rs.getString("rating_name"));
+        int genreId = rs.getInt("genre_id");
+        log.debug("Получен жанр фильма с film_id={} - genre_id={}", id, genreId);
+        Set<Genre> genres = new HashSet<>();
+        if (genreId > 0) {
+            genres.add(new Genre(genreId, rs.getString("genre_name")));
         }
-        //запрос в таблицу Films_genre
-        Set<Genre> genres = genreDao.getGengesFilm(id).stream().collect(Collectors.toSet());
         return new Film(id, name, description, releaseDate, duration, rate, mpa, genres);
     }
 
-
-    //проверка наличие видов рейтингов добавляемого/обновляемого фильма в БД
-    private boolean isRatingsMpa(int mpaId) {
-        MPA ratingMpa = mpaDao.getRating(mpaId);
-        if (ratingMpa == null) {
-            log.debug("Не найден рейтинг фильма с id={}", mpaId);
-            return false;
-        }
-        return true;
-    }
-
-    //проверка наличие видов жанров добавляемого/обновляемого фильма в БД
-    private boolean isGenres(Set<Genre> genres) {
-        for (Genre gr : genres) {
-            Genre genre = genreDao.getGenge(gr.getId());
-            if (genre == null) {
-                log.debug("Для фильма не найден жанр с id=" + gr.getId());
-                return false;
+    private LinkedHashMap<Long, Film> getUniqueFilm(List<Film> films) {
+        LinkedHashMap<Long, Film> filmsMap = new LinkedHashMap<>();
+        for (Film film : films) {
+            if (filmsMap.containsKey(film.getId())) {
+                filmsMap.get(film.getId()).addGenres(film.getGenres().stream().findFirst().get());
+            } else {
+                filmsMap.put(film.getId(), film);
             }
         }
-        log.debug("Для фильма не найден все добавляемые (обновляемые) жанры.");
-        return true;
+        return filmsMap;
     }
 }

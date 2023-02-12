@@ -1,6 +1,8 @@
 package ru.yandex.practicum.filmorate.storage.user.daoImpl;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
 import org.springframework.stereotype.Component;
@@ -12,12 +14,14 @@ import java.sql.SQLException;
 import java.util.List;
 
 @Component
+@Qualifier("friendsDbDao")
+@Primary
 @Slf4j
-public class FriendsDaoImpl implements FriendsDao {
+public class FriendsDbDao implements FriendsDao {
 
     private final JdbcTemplate jdbcTemplate;
 
-    public FriendsDaoImpl(JdbcTemplate jdbcTemplate) {
+    public FriendsDbDao(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 

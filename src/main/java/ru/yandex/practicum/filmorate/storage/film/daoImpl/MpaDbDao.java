@@ -1,6 +1,7 @@
 package ru.yandex.practicum.filmorate.storage.film.daoImpl;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.exceptions.mpa.MpaNotFoundException;
@@ -11,13 +12,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 
-@Component
+@Component("mpaDbDao")
+@Primary
 @Slf4j
-public class MpaDbStorage implements MpaDao {
+public class MpaDbDao implements MpaDao {
 
     private final JdbcTemplate jdbcTemplate;
 
-    public MpaDbStorage(JdbcTemplate jdbcTemplate) {
+    public MpaDbDao(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -37,7 +39,7 @@ public class MpaDbStorage implements MpaDao {
 
     @Override
     public List<MPA> getRatings() {
-        String getMpaSql = "select rating_id,rating_name from ratings_mpa";
+        String getMpaSql = "select rating_id,rating_name from ratings_mpa order by rating_id;";
         List<MPA> mpas = jdbcTemplate.query(getMpaSql, (rs, rowNum) -> mpaMapper(rs));
         if (mpas == null) {
             throw new MpaNotFoundException("Рейтинг MPA не найдены");

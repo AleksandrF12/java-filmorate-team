@@ -59,36 +59,43 @@
 ### Добавление, обновление и получение информации о фильмах
 
 #### Получение информации о фильме с определённым<font color="grey">film_id</font></ins>
+Например, получим информацию о фильме с <font color="grey">film_id</font></ins>=1:
 1.Получаем информацию о фильме из таблицы <font color="green">films</font>:
 ```
-select * from films where film_id=1;
+select f.FILM_ID,f.NAME,f.DESCRIPTION,f.RELEASE_DATE,f.RELEASE_DATE,f.DURATION,f.RATE,
+       rm.RATING_ID,rm.RATING_NAME,g.GENRE_ID,g.GENRE_NAME 
+from (
+        SELECT * 
+        FROM films 
+        WHERE film_id=1
+    ) f 
+LEFT JOIN 
+RATINGS_MPA rm 
+ON f.RATING_ID =rm.RATING_ID 
+LEFT JOIN FILMS_GENRE fg 
+ON f.FILM_ID =fg.FILM_ID 
+LEFT JOIN GENRE g 
+ON fg.GENRE_ID =g.GENRE_ID ORDER BY f.FILM_ID;
 ```
-2.Получаем информацию о рейтингах фильма из таблицы <font color="green">ratings_mpa</font> по <font color="grey">rating_id</font>:
-```
-select rating_id,rating_name from ratings_mpa where rating_id = 2;
-```
-3.Получаем информацию о жанрах фильма из таблиц <font color="green">films_genre</font> и <font color="green">genre</font>:
-```
-select g.genre_id, g.genre_name from (select * from films_genre where film_id=1) fg 
-left join genre g on fg.genre_id=g.genre_id where g.genre_id is not null;
-```
+
 <span>______________________________________________________________________________________________________________________________________</span>
 
 #### Получение информации обо всех фильмах
-1.Получаем информацию обо всех фильмах из таблицы <font color="green">films</font>:
+1.Получаем информацию обо всех фильмах:
 ```
-select * from films;
-```
-2.Получаем информацию о рейтингах фильмов из таблицы <font color="green">ratings_mpa</font> по <font color="grey">rating_id</font>:
-```
-select rating_id,rating_name from ratings_mpa where rating_id = ?;
+select f.FILM_ID ,f.NAME ,f.DESCRIPTION ,f.RELEASE_DATE ,f.RELEASE_DATE ,f.DURATION ,f.RATE ,
+       rm.RATING_ID ,rm.RATING_NAME ,g.GENRE_ID ,g.GENRE_NAME 
+from films f 
+LEFT JOIN 
+RATINGS_MPA rm 
+ON f.RATING_ID =rm.RATING_ID 
+LEFT JOIN FILMS_GENRE fg 
+ON f.FILM_ID =fg.FILM_ID 
+LEFT JOIN GENRE g 
+ON fg.GENRE_ID =g.GENRE_ID 
+ORDER BY f.FILM_ID;
 ```
 
-3.Получаем информацию о жанрах каждого фильма из таблиц <font color="green">films_genre</font> и <font color="green">genre</font>:
-```
-select g.genre_id, g.genre_name from (select * from films_genre where film_id=?) fg 
-left join genre g on fg.genre_id=g.genre_id where g.genre_id is not null;
-```
 <span>______________________________________________________________________________________________________________________________________</span>
 #### Добавление фильма
 1.Добавляем информацию о фильме в таблицу <font color="green">films</font>:
@@ -129,7 +136,6 @@ insert into films_genre(film_id,genre_id) VALUES(1,5);
 #### Удаление фильма
 Например, удалим фильм следующий фильм:
 - <font color="grey">film_id</font>: 1;
-- 
 ```
 delete from films where film_id= 1;
 ```
@@ -137,8 +143,25 @@ delete from films where film_id= 1;
 #### Получение списка самых популярных фильмов
 Получим, например, 5 самых популярных фильмов. Полученные фильмы будут отсортированы в порядке убывания популярности, от самого популярного до самого непопулярного.
 ```
-SELECT f.* FROM FILMS f LEFT JOIN (SELECT FILM_ID,COUNT(*) cLike FROM FILMS_LIKE GROUP BY FILM_ID) fl 
-ON fl.FILM_ID=f.FILM_ID ORDER BY fl.cLike DESC LIMIT (5);
+SELECT f2.FILM_ID ,f2.NAME ,f2.DESCRIPTION ,f2.RELEASE_DATE ,f2.RELEASE_DATE ,f2.DURATION ,f2.RATE,
+       rm.RATING_ID ,rm.RATING_NAME ,g.GENRE_ID ,g.GENRE_NAME 
+FROM (
+        SELECT f.* 
+        FROM FILMS f 
+        LEFT JOIN 
+        (SELECT FILM_ID,COUNT(*) cLike 
+            FROM FILMS_LIKE 
+            GROUP BY FILM_ID
+        ) fl 
+        ON fl.FILM_ID=f.FILM_ID 
+        ORDER BY clike DESC limit(5)
+     ) f2 
+     LEFT JOIN RATINGS_MPA rm 
+     ON f2.RATING_ID =rm.RATING_ID 
+     LEFT JOIN FILMS_GENRE fg 
+     ON f2.FILM_ID =fg.FILM_ID 
+     LEFT JOIN GENRE g 
+     ON fg.GENRE_ID =g.GENRE_ID;
 ```
 <span>______________________________________________________________________________________________________________________________________</span>
 ### Добавление, обновление и получение информации о пользователях
@@ -259,8 +282,29 @@ WHERE USER_ID IN
      ON f1.friend=f2.friend);
 ```
 <span>______________________________________________________________________________________________________________________________________</span>
+### Получение информации о названии конкретного рейтинга MPAA по <font color="grey">rating_id</font>
+Например, получим название рейтинга MPAA с <font color="grey">rating_id</font>=1
+```
+select rating_id,rating_name from ratings_mpa where rating_id = 1;
+```
+<span>______________________________________________________________________________________________________________________________________</span>
+### Получение информации обо всех рейтингах MPAA
+```
+select rating_id,rating_name from ratings_mpa order by rating_id;
+```
+<span>______________________________________________________________________________________________________________________________________</span>
+### Получение информации о названии конкретного жанра по <font color="grey">genre_id</font>
+Например, получим название жанра с <font color="grey">genre_id</font>=1
 
-
+```
+select genre_id,genre_name from genre where genre_id = 1;
+```
+<span>______________________________________________________________________________________________________________________________________</span>
+### Получение информации обо всех жанрах
+```
+select genre_id,genre_name from genre order by genre_id;
+```
+<span>______________________________________________________________________________________________________________________________________</span>
 
 
 

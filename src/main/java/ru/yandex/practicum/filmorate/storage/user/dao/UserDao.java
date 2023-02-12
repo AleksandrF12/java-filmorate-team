@@ -4,7 +4,7 @@ import ru.yandex.practicum.filmorate.model.User;
 import java.util.Set;
 
 //методы добавления, удаления и модификации объектов.
-public interface UserStorage {
+public interface UserDao {
     User addUser(User user);
 
     User updateUser(User user);

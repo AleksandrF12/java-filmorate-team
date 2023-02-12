@@ -14,11 +14,11 @@ import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.MPA;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.film.dao.FilmLikeDao;
-import ru.yandex.practicum.filmorate.storage.film.daoImpl.FilmDbStorage;
-import ru.yandex.practicum.filmorate.storage.film.daoImpl.GenreDbStorage;
-import ru.yandex.practicum.filmorate.storage.film.daoImpl.MpaDbStorage;
+import ru.yandex.practicum.filmorate.storage.film.daoImpl.FilmDbDao;
+import ru.yandex.practicum.filmorate.storage.film.daoImpl.GenreDbDao;
+import ru.yandex.practicum.filmorate.storage.film.daoImpl.MpaDbDao;
 import ru.yandex.practicum.filmorate.storage.user.dao.FriendsDao;
-import ru.yandex.practicum.filmorate.storage.user.daoImpl.UserDbStorage;
+import ru.yandex.practicum.filmorate.storage.user.daoImpl.UserDbDao;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -32,12 +32,12 @@ import static org.junit.jupiter.api.Assertions.*;
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 class FilmoRateApplicationTests {
 
-    private final UserDbStorage userStorage;
+    private final UserDbDao userStorage;
     private final FriendsDao friendsDao;
-    private final FilmDbStorage filmDbStorage;
+    private final FilmDbDao filmDbStorage;
     private final FilmLikeDao filmLikeDao;
-    private final MpaDbStorage mpaDbStorage;
-    private final GenreDbStorage genreDbStorage;
+    private final MpaDbDao mpaDbStorage;
+    private final GenreDbDao genreDbStorage;
 
     private final User user1 = new User(1, "user1_test_1@email.ru", "user1_login", "user1_name",
             LocalDate.of(2002, 5, 3));
@@ -198,7 +198,7 @@ class FilmoRateApplicationTests {
         assertEquals("Драма", genresFilm1.get(0).getName(), "Жанры фильм с id=2 не совпадают.");
         assertEquals("Триллер", genresFilm1.get(1).getName(), "Жанры фильм с id=2 не совпадают.");
         //получить все жанры
-        genres = genreDbStorage.getGenres();
+        genres = genreDbStorage.getGenresFilms();
         assertNotNull(genres, "Список фильмов пустой.");
         assertEquals(6, genres.size(), "Количество фильмов не совпадает.");
         assertEquals("Комедия", genres.get(0).getName(), "Название жанра с id=1 не совпадает.");

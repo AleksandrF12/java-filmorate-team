@@ -1,6 +1,8 @@
 package ru.yandex.practicum.filmorate.storage.film.daoImpl;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.exceptions.film.FilmNotFoundException;
@@ -9,14 +11,16 @@ import ru.yandex.practicum.filmorate.storage.film.dao.GenreDao;
 import ru.yandex.practicum.filmorate.storage.film.dao.MpaDao;
 
 @Component
+@Primary
 @Slf4j
-public class FilmLikeDbStorage implements FilmLikeDao {
+public class FilmLikeDbDao implements FilmLikeDao {
 
     private final JdbcTemplate jdbcTemplate;
     private final MpaDao mpaDao;
     private final GenreDao genreDao;
 
-    public FilmLikeDbStorage(JdbcTemplate jdbcTemplate, MpaDao mpaDao, GenreDao genreDao) {
+    public FilmLikeDbDao(JdbcTemplate jdbcTemplate, @Qualifier("mpaDbDao") MpaDao mpaDao,
+                         @Qualifier("genreDbDao") GenreDao genreDao) {
         this.jdbcTemplate = jdbcTemplate;
         this.mpaDao = mpaDao;
         this.genreDao = genreDao;

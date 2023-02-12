@@ -8,7 +8,7 @@ public interface GenreDao {
     Genre getGenge(int id);
     List<Genre> getGengesFilm(long filmId);
 
-    List<Genre> getGenres();
+    List<Genre> getGenresFilms();
 
     void addFilmGenre(long filmId,int genreId);
 

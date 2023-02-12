@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exceptions.user.UserNotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.dao.FriendsDao;
-import ru.yandex.practicum.filmorate.storage.user.dao.UserStorage;
+import ru.yandex.practicum.filmorate.storage.user.dao.UserDao;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -14,10 +14,11 @@ import java.util.stream.Collectors;
 @Slf4j
 public class UserService {
 
-   private final UserStorage userStorage;
+   private final UserDao userStorage;
    private final FriendsDao friendsDao;
 
-    public UserService(UserStorage userStorage, FriendsDao friendsDao) {
+    public UserService(UserDao userStorage,
+                       FriendsDao friendsDao) {
         this.userStorage = userStorage;
         this.friendsDao = friendsDao;
     }
@@ -31,7 +32,7 @@ public class UserService {
     //обновление пользователя
     public User updateUser(User user) {
         log.info("Получен запрос на обновление пользователя...");
-//        isValidIdUser(user.getId());
+        isValidIdUser(user.getId());
         return userStorage.updateUser(user);
     }
 
