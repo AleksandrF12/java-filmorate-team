@@ -64,18 +64,15 @@
 ```
 select f.FILM_ID,f.NAME,f.DESCRIPTION,f.RELEASE_DATE,f.RELEASE_DATE,f.DURATION,f.RATE,
        rm.RATING_ID,rm.RATING_NAME,g.GENRE_ID,g.GENRE_NAME 
-from (
-        SELECT * 
-        FROM films 
-        WHERE film_id=1
-    ) f 
+from films f 
 LEFT JOIN 
 RATINGS_MPA rm 
 ON f.RATING_ID =rm.RATING_ID 
 LEFT JOIN FILMS_GENRE fg 
 ON f.FILM_ID =fg.FILM_ID 
 LEFT JOIN GENRE g 
-ON fg.GENRE_ID =g.GENRE_ID ORDER BY f.FILM_ID;
+ON fg.GENRE_ID =g.GENRE_ID 
+WHERE f.FILM_ID=1;
 ```
 
 <span>______________________________________________________________________________________________________________________________________</span>
