@@ -1,48 +1,42 @@
 package ru.yandex.practicum.filmorate.model;
 
-import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
-import ru.yandex.practicum.filmorate.model.validator.DateBefore;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Positive;
-import javax.validation.constraints.Size;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Data
-@AllArgsConstructor
-//генерирует @Getter,@Setter,@ToString,@EqualsAndHashCode,@RequiredArgsConstructor
+@Builder
 public class Film {
-    private long id; //целочисленный идентификатор
-
+    private Long id;
     @NotBlank
-    private String name; //название
-
-    @Size(max = 200)
-    private String description; //описание
-
-    @DateBefore
-    private LocalDate releaseDate; //дата релиза
-
+    private String name;
+    private String description;
+    private LocalDate releaseDate;
     @Positive
-    private int duration; //продолжительность фильма
+    private Integer duration;
+    private final Set<Long> likes = new HashSet<>();
+    private Rating mpa;
+    private List<Genre> genres;
+    private List<Director> directors;
 
-    private int rate;
-
-    private MPA mpa; //рейтинг фильма
-
-    private Set<Genre> genres; //жанр фильма
-
-    public Set<Genre> getGenres() {
-        return genres;
+    public Film addLike(long userId) {
+        likes.add(userId);
+        return this;
     }
 
-    public void setGenres(Set<Genre> genres) {
-        this.genres = genres;
+    public Film removeLike(long userId) {
+        likes.remove(userId);
+        return this;
     }
 
-    public void addGenres(Genre genre) {
-        this.genres.add(genre);
+    public List<Long> getLikes() {
+        return new ArrayList<>(likes);
     }
 }

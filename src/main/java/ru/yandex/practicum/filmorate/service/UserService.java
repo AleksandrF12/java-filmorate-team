@@ -1,108 +1,126 @@
 package ru.yandex.practicum.filmorate.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import ru.yandex.practicum.filmorate.exceptions.user.UserNotFoundException;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.model.Event;
 import ru.yandex.practicum.filmorate.model.User;
-import ru.yandex.practicum.filmorate.storage.user.dao.FriendsDao;
-import ru.yandex.practicum.filmorate.storage.user.dao.UserDao;
+import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Service
 @Slf4j
+@Service
+@RequiredArgsConstructor
 public class UserService {
 
-   private final UserDao userStorage;
-   private final FriendsDao friendsDao;
+    private final UserStorage userStorage;
 
-    public UserService(UserDao userStorage,
-                       FriendsDao friendsDao) {
-        this.userStorage = userStorage;
-        this.friendsDao = friendsDao;
-    }
-
-    //добавление пользователя
     public User addUser(User user) {
-        log.info("Получен запрос на добавление пользователя...");
-        return userStorage.addUser(user);
+        if (isInvalidUser(user)) {
+            throw new ValidationException("Invalid user properties");
+        } else {
+            user = user.normalize();
+            return userStorage.add(user);
+        }
     }
 
-    //обновление пользователя
+    public User getUser(Long userId) {
+        if (userStorage.get(userId) == null) {
+            throw new NotFoundException("User with id= " + userId + " not found");
+        }
+        return userStorage.get(userId);
+    }
+
     public User updateUser(User user) {
-        log.info("Получен запрос на обновление пользователя...");
-        isValidIdUser(user.getId());
-        return userStorage.updateUser(user);
-    }
-
-    //возвращает информацию обо всех пользователях
-    public Set<User> getUsers() {
-        log.info("Получен запрос на чтение пользователей...");
-        return userStorage.getUsers().stream().collect(Collectors.toSet());
-    }
-
-    //получение данных о пользователе
-    public User getUser(long userId) {
-        log.info("Получен запрос на получение данных пользователя с id={}", userId);
-//        isValidIdUser(userId);
-        log.info("Пользователь с id={} получен.", userId);
-        return userStorage.getUser(userId);
-    }
-
-    //добавление в друзья
-    public void addFriend(long userId, long friendId) {
-        log.debug("Получен запрос на добавление для пользователя с id={} друга с id={}", userId, friendId);
-        isValidIdUser(userId);
-        isValidIdUser(friendId);
-        isNotEqualIdUser(userId, friendId);
-        //проверка наличия пользователей в БД
-        userStorage.getUser(userId);
-        userStorage.getUser(friendId);
-        friendsDao.addFriend(userId,friendId);
-        log.info("Для пользователя с id = {} добавлен друг с id={}", userId, friendId);
-    }
-
-    //удаление из друзей
-    public void deleteFriend(long userId, long friendId) {
-        log.debug("Получен запрос на удаление для пользователя с id={} друга с id={}", userId, friendId);
-        isValidIdUser(userId);
-        isValidIdUser(friendId);
-        isNotEqualIdUser(userId, friendId);
-        log.debug("Запрос на удаление для пользователя с id={} друга с id={} одобрен.", userId, friendId);
-        friendsDao.deleteFriend(userId,friendId);
-    }
-
-    //возвращение списка друзей пользователя
-    public List<User> getFriends(long userId) {
-        log.debug("Получен запрос на получение для пользователя с id={} списка друзей", userId);
-        isValidIdUser(userId);
-        return friendsDao.getFriends(userId);
-    }
-
-
-    //список друзей, общих с другим пользователем.
-    public List<User> getCommonFriends(long userId, long otherId) {
-        log.debug("Получен запрос на поиск общих друзей для пользователей с userId={} и otherId={}.", userId, otherId);
-        isValidIdUser(userId);
-        isValidIdUser(otherId);
-        isNotEqualIdUser(userId, otherId);
-        return friendsDao.getCommonFriends(userId,otherId);
-    }
-
-    private boolean isValidIdUser(long userId) {
-        if (userId <= 0) {
-            throw new UserNotFoundException("Некорректный id=" + userId + " пользователя.");
+        if (isInvalidUser(user)) {
+            throw new ValidationException("Invalid user properties");
+        } else if (userStorage.get(user.getId()) != null) {
+            user = user.normalize();
+            userStorage.update(user);
+        } else {
+            throw new NotFoundException("User with such id not found");
         }
-        log.debug("Валидация пользователя с id={} прошла успешно.", userId);
-        return true;
+        return user;
     }
 
-    //проверяет не равныли id пользователя и друга
-    private boolean isNotEqualIdUser(long userId, long friendId) {
-        if (userId == friendId) {
-            throw new UserNotFoundException("Пользователь с id=" + userId + " не может добавить сам себя в друзья.");
+    public void deleteUser(Long userId) {
+        Optional.ofNullable(userStorage.get(userId))
+                .orElseThrow(() -> new NotFoundException("User for userId " + userId + " not found!"));
+        userStorage.deleteUser(userId);
+    }
+
+    public User addFriend(User user, long friendId) {
+        if (userStorage.get(user.getId()) == null) {
+            throw new NotFoundException("User not found");
+        } else if (userStorage.get(friendId) == null) {
+            throw new NotFoundException("Friend not found");
+        } else {
+            userStorage.addEvent(user.getId(), "FRIEND", "ADD", friendId);
+            return userStorage.addFriend(user, friendId);
         }
-        return true;
+    }
+
+    public User removeFriend(User user, long friendId) {
+        if (userStorage.get(user.getId()) == null) {
+            throw new NotFoundException("User not found");
+        } else if (userStorage.get(friendId) == null) {
+            throw new NotFoundException("Friend not found");
+        } else {
+            userStorage.addEvent(user.getId(), "FRIEND", "REMOVE", friendId);
+            return userStorage.removeFriend(user, friendId);
+        }
+    }
+
+    public List<User> getFreindsList(User user) {
+        if (userStorage.get(user.getId()) == null) {
+            throw new NotFoundException("User not found");
+        } else {
+            return userStorage.getFriends(user);
+        }
+    }
+
+    public List<User> getMutualFriends(User actualUser, User targetUser) {
+        Set<Long> actualUserFriends = userStorage.getFriends(actualUser)
+                .stream()
+                .map(User::getId)
+                .collect(Collectors.toSet());
+        Set<Long> targetUserFriends = userStorage.getFriends(targetUser)
+                .stream()
+                .map(User::getId)
+                .collect(Collectors.toSet());
+        Set<Long> mutualFriendsIds = actualUserFriends.stream()
+                .filter(targetUserFriends::contains)
+                .collect(Collectors.toSet());
+        List<User> mutualFriends = new ArrayList<>();
+        for (Long id : mutualFriendsIds) {
+            mutualFriends.add(userStorage.get(id));
+        }
+        return mutualFriends;
+    }
+
+    private boolean isInvalidUser(User user) {
+        if (user.getLogin().isBlank() || user.getLogin().contains(" ")) {
+            log.debug("Invalid User-object: login is blank");
+            return true;
+        }
+        if (user.getEmail().isBlank() || !user.getEmail().contains("@")) {
+            log.debug("Invalid User-object: email is invalid");
+            return true;
+        }
+        if (user.getBirthday().isAfter(LocalDate.now())) {
+            log.debug("Invalid User-object: birthday is from future");
+            return true;
+        }
+        return false;
+    }
+
+    public Collection<Event> getEventFeed(User user) {
+        return Optional.ofNullable(userStorage.getEventFeed(user))
+                .orElseThrow(() -> new NotFoundException("Events for userId " + user.getId() + " not found!"));
     }
 }

@@ -1,171 +1,209 @@
 package ru.yandex.practicum.filmorate.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import ru.yandex.practicum.filmorate.exceptions.ValidationException;
-import ru.yandex.practicum.filmorate.exceptions.film.FilmNotFoundException;
-import ru.yandex.practicum.filmorate.exceptions.user.UserNotFoundException;
+import ru.yandex.practicum.filmorate.exception.BadRequestException;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
+import ru.yandex.practicum.filmorate.model.Director;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
-import ru.yandex.practicum.filmorate.model.MPA;
-import ru.yandex.practicum.filmorate.model.User;
-import ru.yandex.practicum.filmorate.storage.film.dao.FilmLikeDao;
-import ru.yandex.practicum.filmorate.storage.film.dao.FilmDao;
-import ru.yandex.practicum.filmorate.storage.film.dao.GenreDao;
-import ru.yandex.practicum.filmorate.storage.film.dao.MpaDao;
-import ru.yandex.practicum.filmorate.storage.user.dao.UserDao;
+import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
+import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
-import java.util.List;
-import java.util.Set;
+import java.time.LocalDate;
+import java.util.*;
 import java.util.stream.Collectors;
 
-//отвечает за операции с фильмами, — добавление и удаление лайка, вывод 10 наиболее популярных фильмов
-// по количеству лайков. Пусть пока каждый пользователь может поставить лайк фильму только один раз.
-
-@Service
 @Slf4j
+@Service
+@RequiredArgsConstructor
 public class FilmService {
-    private final FilmDao filmStorage;
-    private final UserDao userStorage;
-    private final MpaDao mpaDao;
-    private final FilmLikeDao filmLikeDao;
-    private final GenreDao genreDao;
+    private final FilmStorage filmStorage;
+    private final UserService userService;
+    private final GenreService genreService;
+    private final DirectorService directorService;
+    private final UserStorage userStorage;
 
-    public FilmService(FilmDao filmStorage, UserDao userStorage, MpaDao mpaDao, FilmLikeDao filmLikeDao, GenreDao genreDao) {
-        this.filmStorage = filmStorage;
-        this.userStorage = userStorage;
-        this.mpaDao = mpaDao;
-        this.filmLikeDao = filmLikeDao;
-        this.genreDao = genreDao;
+    public List<Film> getAllFilms() {
+        return filmStorage.getAll()
+                .stream()
+                .sorted((f1, f2) -> Math.toIntExact((f1.getId() - f2.getId())))
+                .collect(Collectors.toList());
     }
 
-    //добавляем фильм
+    public Film getFilm(long filmId) {
+        if (filmStorage.get(filmId) == null) {
+            throw new NotFoundException("Film with id= " + filmId + " not found");
+        }
+        return filmStorage.get(filmId);
+    }
+
     public Film addFilm(Film film) {
-        log.info("Запрос на добавление фильма: {} направлен в хранилище...",film.getName());
-
-        //проверка наличия рейтинга в таблице ratings (MPA)
-        if (!isRatingsMpa(film.getMpa().getId())) {
-            throw new ValidationException("Не найден рейтинг фильма с id=" + film.getMpa().getId());
+        if (isInvalidFilm(film)) {
+            throw new ValidationException("Invalid film-object received");
         }
-
-        //проверка наличия жанра в таблице genres
-        if (film.getGenres() != null && !film.getGenres().isEmpty()) {
-            if (!isGenres(film.getGenres())) {
-                throw new ValidationException("Для обновляемого фильма не найдены все жанры.");
-            }
-        }
-        return filmStorage.addFilm(film);
+        return filmStorage.add(this.normalizeGenresInFilm(film));
     }
 
-    //обновляем фильм
     public Film updateFilm(Film film) {
-        isValidFilmId(film.getId());
-        //проверка наличия рейтинга в таблице ratings (MPA)
-        //если он задан
-        if (!isRatingsMpa(film.getMpa().getId())) {
-            throw new ValidationException("Не найден рейтинг фильма с id=" + film.getMpa().getId());
+        if (isInvalidFilm(film)) {
+            throw new ValidationException("Invalid user properties");
+        } else if (filmStorage.get(film.getId()) == null) {
+            throw new NotFoundException("Film with such id not found");
+        } else {
+            return filmStorage.update(this.normalizeGenresInFilm(film));
         }
 
-        //поиск жанра в таблице genres
-        //если получено пустое поле с жанрами, то игнорируем проверку
-        if (film.getGenres() != null && !film.getGenres().isEmpty()) {
-            if (!isGenres(film.getGenres())) {
-                throw new ValidationException("Для обновляемого фильма не найдены все жанры.");
-            }
-        }
-        return filmStorage.updateFilm(film);
     }
 
-    //удаление фильма по id
-    public void deleteFilm(long filmId) {
-        isValidFilmId(filmId);
+    public void deleteFilm(Long filmId) {
+        Optional.ofNullable(filmStorage.get(filmId))
+                .orElseThrow(() -> new NotFoundException("Film for userId " + filmId + " not found!"));
         filmStorage.deleteFilm(filmId);
     }
 
-    //получение фильма по id
-    public Film getFilm(long filmId) {
-        log.info("GET Запрос на поиск фильма с id={}", filmId);
-        isValidFilmId(filmId);
-        return filmStorage.getFilm(filmId);
-    }
+    public Film addLike(Long filmId, Long userId) {
+        Film film = this.getFilm(filmId); // throws 404 if film doesn't exist
+        userService.getUser(userId); // check if user exist, else throw 404
 
-    //возвращает информацию обо всех фильмах
-    public List<Film> getFilms() {
-        return filmStorage.getFilms();
-    }
-
-    //пользователь ставит лайк фильму.
-    public void addLike(long filmId, long userId) {
-        log.debug("Запрос на добавление фильму с id={} лайка от пользователя с userId={}", filmId, userId);
-        //проверка существования фильма с id
-        isValidFilmId(filmId);
-        isValidUserId(userId);
-        Film film=filmStorage.getFilm(filmId);
-        if(film==null) {
-            throw new FilmNotFoundException("Фильм с id="+filmId+" не найден.");
+        if (!filmStorage.getLikes(film).contains(userId)) {
+            filmStorage.addLike(film, userId);
+        } else {
+            log.debug("The film has already got like from user with id={}, " +
+                    "but we still return 200OK according to postman tests %)", userId);
         }
-        //проверка существования пользователя с id
-        User user=userStorage.getUser(userId);
-        if(user==null) {
-            throw new UserNotFoundException("Пользователь с id=" + userId + " не найден.");
-        }
-        filmLikeDao.addLike(filmId,userId);
+        userStorage.addEvent(userId, "LIKE", "ADD", filmId);
+        return film;
     }
 
-    //пользователь удаляет лайк.
-    public void deleteLike(long filmId, long userId) {
-        log.debug("Запрос на удаление лайка фильму с id={} лайка от пользователя с userId={}", filmId, userId);
-        isValidFilmId(filmId);
-        isValidUserId(userId);
-        filmLikeDao.deleteLike(filmId,userId);
+    public List<Long> getLikesByFilm(Long filmId) {
+        Film film = this.getFilm(filmId); // throws 404 if film doesn't exist
+        return filmStorage.getFilmLikes(film);
     }
 
-    //вывод популярных фильмов,если параметр не задан, то выводим 10 фильмов
-    public List<Film> getPopularFilms(long count) {
-        //проверка корректности значения count : null, меньше 0
-        if (count <= 0) {
-            throw new ValidationException("Запрошено отрицательное количество популярных фильмов.");
+    public Film removeLike(Long filmId, Long userId) {
+        Film film = this.getFilm(filmId); // throws 404 if film doesn't exist
+        userService.getUser(userId); // check if user exist, else throw 404
+
+        if (filmStorage.getLikes(film).contains(userId)) {
+            filmStorage.removeLike(film, userId);
+        } else {
+            throw new NotFoundException("Film has no like from user " + userId);
         }
-        log.debug("Запрос на получение {} популярных фильмов...", count);
+        userStorage.addEvent(userId, "LIKE", "REMOVE", filmId);
+
+        return film;
+    }
+
+    public List<Film> getPopularFilms(int count) {
         return filmStorage.getPopularFilms(count);
     }
 
-    //проверка корректности значений filmId
-    private boolean isValidFilmId(long filmId) {
-        if (filmId <= 0) {
-            throw new FilmNotFoundException("Некорректный id фильма.");
+    public List<Film> getSortedFilmsFromDirector(Long directorId, String sortBy) {
+        Director director = directorService.getDirector(directorId);
+        if (sortBy.isBlank() || (!sortBy.equals("year") && !sortBy.equals("likes"))) {
+            throw new BadRequestException("Bad request parameter 'sortBy'");
         }
-        return true;
+        return filmStorage.getSortedFilmsFromDirector(director.getId(), sortBy);
     }
 
-    //проверка корректности значений filmId
-    private boolean isValidUserId(long userId) {
-        if (userId <= 0) {
-            throw new UserNotFoundException("Некорректный id пользователя.");
+    public List<Film> searchFilms(String query, String by) {
+        if (query.isBlank() || by.isBlank()
+                || (!by.equals("director") && !by.equals("title")
+                && !by.equals("director,title") && !by.equals("title,director"))) {
+            log.debug("Incorrect parameters");
+            throw new BadRequestException("Bad request parameter 'query' or 'by'");
         }
-        return true;
+        return filmStorage.searchFilms(query, by);
     }
 
-    //проверка наличие видов рейтингов добавляемого/обновляемого фильма в БД
-    private boolean isRatingsMpa(int mpaId) {
-        MPA ratingMpa = mpaDao.getRating(mpaId);
-        if (ratingMpa == null) {
-            log.debug("Не найден рейтинг фильма с id={}", mpaId);
-            return false;
+    private Film normalizeGenresInFilm(Film film) {
+        if (film.getGenres() != null) {
+            film.setGenres(new ArrayList<>(new HashSet<>(film.getGenres())));
         }
-        return true;
+        return film;
     }
 
-    //проверка наличие видов жанров добавляемого/обновляемого фильма в БД
-    private boolean isGenres(Set<Genre> genres) {
-        Set<Integer> genresId = genreDao.getGenresFilms().stream().map(g -> g.getId()).collect(Collectors.toSet());
-        for (Genre gr : genres) {
-            if (!genresId.contains(gr.getId())) {
-                log.debug("Для фильма не найден жанр с id=" + gr.getId());
-                return false;
+    private boolean isInvalidFilm(Film film) {
+        if (film.getName().isBlank()) {
+            log.debug("Invalid Film-object: filmName is blank");
+            return true;
+        }
+        if (film.getDescription().length() > 200) {
+            log.debug("Invalid Film-object: film description is too long");
+            return true;
+        }
+        if (film.getReleaseDate().isBefore(LocalDate.of(1895, 12, 28))) {
+            log.debug("Invalid Film-object: too early release date");
+            return true;
+        }
+        if (film.getDuration() <= 0) {
+            log.debug("Invalid Film-object: duration is <= 0");
+            return true;
+        }
+        if (film.getGenres() != null) {
+            for (Genre genre : film.getGenres()) {
+                if (genreService.getGenre(genre.getId()) == null) {
+                    return true;
+                }
             }
         }
-        log.debug("Для фильма не найден все добавляемые (обновляемые) жанры.");
-        return true;
+        return false;
+    }
+
+    public List<Film> getFilmsSharedFilmAndSort(Long userId, Long friendId) { //вывод общих с другом фильмов с сортировкой по их популярности.
+        if (userStorage.get(userId) == null || userStorage.get(friendId) == null) {
+            log.debug("Invalid User ID: User ID is Not found");
+            throw new ValidationException("Bad request parameter 'sortBy'");
+        }
+        List<Long> filmLikesUserId = new ArrayList<>(filmStorage.getIdFilmsWithUserLikes(userId));
+        List<Long> filmLikesFriendsId = new ArrayList<>(filmStorage.getIdFilmsWithUserLikes(friendId));
+        List<Film> mutualFilmList = new ArrayList<>();
+        for (long t : filmLikesUserId) {
+            if (filmLikesFriendsId.contains(t)) {
+                mutualFilmList.add(filmStorage.get(t));
+            }
+        }
+        Collections.sort(mutualFilmList, new Comparator<Film>() {
+            @Override
+            public int compare(Film o1, Film o2) {
+                return o1.getLikes().size() - o2.getLikes().size();
+            }
+        });
+        return mutualFilmList;
+    }
+
+    private void isInvalidCountOrGenreIdOrYear(int count, int genreId, int year) {
+        if (count < 1) {
+            log.debug("Invalid Count: Count is < 1");
+            throw new ValidationException("Bad request parameter 'sortBy'");
+        }
+        if (genreId < 0) {
+            log.debug("Invalid Genre ID: Genre ID < 1");
+            throw new ValidationException("Bad request parameter 'sortBy'");
+        }
+        if (year < 0) {
+            log.debug("Invalid Year: Year < 1");
+            throw new ValidationException("Bad request parameter 'sortBy'");
+        }
+    }
+
+    public List<Film> getPopularFilmGenreIdYear(int count, int genreId, int year) {
+        isInvalidCountOrGenreIdOrYear(count, genreId, year);
+        List<Long> filmIdSorted = new ArrayList<>(filmStorage.getPopularFilmGenreIdYear(year, genreId, count));
+        List<Film> filmListSorted = new ArrayList<>();
+        for (long t : filmIdSorted) {
+            filmListSorted.add(filmStorage.get(t));
+        }
+
+        return filmListSorted;
+    }
+
+    public List<Film> getRecommendations(Long userId) {
+        //Проверим есть ли пользователь, для которого составляем рекомендацию
+        userService.getUser(userId);
+        return filmStorage.getRecommendations(userId);
     }
 }

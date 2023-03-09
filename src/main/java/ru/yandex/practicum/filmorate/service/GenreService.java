@@ -1,27 +1,23 @@
 package ru.yandex.practicum.filmorate.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Genre;
-import ru.yandex.practicum.filmorate.storage.film.dao.GenreDao;
+import ru.yandex.practicum.filmorate.storage.genre.GenreStorage;
 
-import java.util.List;
-
-@Service
 @Slf4j
+@Service
+@RequiredArgsConstructor
 public class GenreService {
-    private final GenreDao genreDao;
 
-    public GenreService(GenreDao genreDao) {
-        this.genreDao = genreDao;
-    }
+    private final GenreStorage genreStorage;
 
-    //возвращает информацию обо всех рейтингах MPA
-    public List<Genre> getGenres() {
-        return genreDao.getGenresFilms();
-    }
-
-    public Genre getGenre(int genreId) {
-        return genreDao.getGenge(genreId);
+    public Genre getGenre(long id) {
+        Genre genre = genreStorage.get(id);
+        if (genre == null) {
+            throw new NotFoundException("MPA rating with id=" + id + " not found");
+        } else return genre;
     }
 }

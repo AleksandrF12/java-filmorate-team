@@ -1,209 +1,398 @@
 package ru.yandex.practicum.filmorate;
 
 import lombok.RequiredArgsConstructor;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
-import ru.yandex.practicum.filmorate.exceptions.film.FilmNotFoundException;
-import ru.yandex.practicum.filmorate.exceptions.genre.GenreNotFoundException;
-import ru.yandex.practicum.filmorate.exceptions.mpa.MpaNotFoundException;
-import ru.yandex.practicum.filmorate.exceptions.user.UserNotFoundException;
+import ru.yandex.practicum.filmorate.controller.FilmController;
+import ru.yandex.practicum.filmorate.controller.GenreController;
+import ru.yandex.practicum.filmorate.controller.RatingController;
+import ru.yandex.practicum.filmorate.controller.UserController;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
-import ru.yandex.practicum.filmorate.model.MPA;
+import ru.yandex.practicum.filmorate.model.Rating;
 import ru.yandex.practicum.filmorate.model.User;
-import ru.yandex.practicum.filmorate.storage.film.dao.FilmLikeDao;
-import ru.yandex.practicum.filmorate.storage.film.daoImpl.FilmDbDao;
-import ru.yandex.practicum.filmorate.storage.film.daoImpl.GenreDbDao;
-import ru.yandex.practicum.filmorate.storage.film.daoImpl.MpaDbDao;
-import ru.yandex.practicum.filmorate.storage.user.dao.FriendsDao;
-import ru.yandex.practicum.filmorate.storage.user.daoImpl.UserDbDao;
+import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
+import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 
 @SpringBootTest
 @AutoConfigureTestDatabase
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
-class FilmoRateApplicationTests {
+class FilmorateApplicationTests {
 
-    private final UserDbDao userStorage;
-    private final FriendsDao friendsDao;
-    private final FilmDbDao filmDbStorage;
-    private final FilmLikeDao filmLikeDao;
-    private final MpaDbDao mpaDbStorage;
-    private final GenreDbDao genreDbStorage;
-
-    private final User user1 = new User(1, "user1_test_1@email.ru", "user1_login", "user1_name",
-            LocalDate.of(2002, 5, 3));
-    private final User user1Update = new User(1, "user1_test_1_Update@email.ru", "user1_login_update", "",
-            LocalDate.of(2002, 4, 3));
-    private final User userUnknown = new User(9999, "user1_test_1@email.ru", "user1_login", "user1_name",
-            LocalDate.of(2002, 5, 3));
-    private final Film film = new Film(1, "film1_test_name", "film1_test_description",
-            LocalDate.of(2018, 1, 1), 180, 4, new MPA(1, "R"),
-            Set.of(new Genre(1, "Комедия"), new Genre(4, "Триллер")));
-    private final Film filmUpdateUnknown = new Film(9999, "film1_test_name", "film1_test_description",
-            LocalDate.of(2018, 1, 1), 180, 4, new MPA(1, "R"),
-            Set.of(new Genre(1, "Комедия"), new Genre(4, "Триллер")));
-    private final Film filmUpdateCorrect = new Film(5, "film1_test_name_update",
-            "film1_test_description_update", LocalDate.of(2019, 1, 1), 170, 7,
-            new MPA(1, "G"), Set.of(new Genre(5, "Документальный"), new Genre(4, "Триллер")));
+    private final UserController userController;
+    private final UserStorage userStorage;
+    private final FilmController filmController;
+    private final FilmStorage filmStorage;
+    private final GenreController genreController;
+    private final RatingController ratingController;
 
     @Test
-    public void testCrudUsers() {
-        //создание пользователя: id пользователя, имя пользователя и др. данные
-        User user = userStorage.addUser(user1);
-        User userGet = userStorage.getUser(user.getId());
-        assertEquals(7, userGet.getId(), "id добавленного пользователя не совпадает.");
-        assertEquals("user1_name", userGet.getName(), "name добавленного пользователя не совпадает.");
-        // обновление пользователя с неизвестным id: код возвращаемой ошибки
-        assertThrows(UserNotFoundException.class, () -> userStorage.updateUser(userUnknown));
-        // обновление пользователя с корректным id: id пользователя, имя пользователя и др. данные
-        user = userStorage.updateUser(user1Update);
-        assertEquals("user1_login_update", user.getName(), "name добавленного пользователя не совпадает.");
-        assertThat(user).hasFieldOrPropertyWithValue("name", "user1_login_update");
+    public void contextLoads() {
+    }
+
+    @BeforeEach
+    public void beforeEach() {
+        userController.addUser(createNewUser());
+        filmController.addFilm(createNewFilm());
+    }
+
+    @AfterEach
+    public void afterEach() {
+        userStorage.deleteAll();
+        filmStorage.deleteAll();
+    }
+
+
+    // User tests
+    @Test
+    public void addNewUser() {
+        assertThat(Optional.of(userController.addUser(createNewUser())))
+                .isPresent()
+                .hasValueSatisfying(user ->
+                        assertThat(user).hasFieldOrPropertyWithValue("id", 2L)
+                );
+
     }
 
     @Test
-    public void testGetUser() {
-        User user = userStorage.getUser(2);
-        assertThat(user).hasFieldOrPropertyWithValue("name", "user2_name");
+    public void addInvalidUser() {
+        assertThrows(ValidationException.class, () -> userController.addUser(User.builder()
+                .name(" ")
+                .login(" ")
+                .email("mail@mail.ru")
+                .birthday(LocalDate.of(2000, 1, 1))
+                .build()), "testing user add invalid name");
+
+        assertThrows(ValidationException.class, () -> userController.addUser(User.builder()
+                .name("name")
+                .login("login")
+                .email(" ")
+                .birthday(LocalDate.of(2000, 1, 1))
+                .build()), "testing user add invalid email");
+
+        assertThrows(ValidationException.class, () -> userController.addUser(User.builder()
+                .name("name")
+                .login("login")
+                .email("mail@mail.ru")
+                .birthday(LocalDate.of(2200, 1, 1))
+                .build()), "testing user add invalid birthday");
     }
 
     @Test
-    public void testCrudUserFriends() {
-        //узнать нескольких общих друзей пользователей
-        List<User> friendsUser1 = friendsDao.getFriends(1);
-        List<User> friendsUser4 = friendsDao.getFriends(4);
-        List<User> commonFriends = friendsDao.getCommonFriends(1, 4);
-        assertEquals(2, commonFriends.size(), "Количество общих друзей пользователей не совпадает.");
-        assertEquals(2, commonFriends.get(0).getId(), "Друзья пользователей с id =1,4 не совпадают.");
-        assertEquals(3, commonFriends.get(1).getId(), "Друзья пользователей с id =1,4 не совпадают.");
+    public void getUserById() {
+        Optional<User> userOptional = Optional.of(userController.getUser(1L));
 
-        //добавить друга: обоюдная и необоюдная дружба
-        friendsDao.addFriend(1, 5);
-        friendsUser1 = friendsDao.getFriends(1);
-        List<User> friendsUser5 = friendsDao.getFriends(5);
-        assertEquals(2, friendsUser1.get(0).getId(), "Друзья пользователя с id=1 не совпадают.");
-        assertEquals(3, friendsUser1.get(1).getId(), "Друзья пользователя с id=1 не совпадают.");
-        assertEquals(5, friendsUser1.get(2).getId(), "Друзья пользователя с id=1 не совпадают.");
-        assertEquals(0, friendsUser5.size(), "У пользователя с id=5 не должно быть друзей.");
-        friendsDao.addFriend(5, 1);
-        friendsUser5 = friendsDao.getFriends(5);
-        assertEquals(1, friendsUser5.get(0).getId(), "Друзья пользователя с id=5 не совпадают.");
-        //удалить друга
-        friendsDao.deleteFriend(5, 1);
-        friendsUser5 = friendsDao.getFriends(5);
-        assertEquals(0, friendsUser5.size(), "У пользователя с id=5 не должно быть друзей.");
+        assertThat(userOptional)
+                .isPresent()
+                .hasValueSatisfying(user ->
+                        assertThat(user).hasFieldOrPropertyWithValue("id", 1L)
+                );
     }
 
     @Test
-    public void testCrudFilms() {
-        //добавление фильма
-        filmDbStorage.addFilm(film);
-        Film filmTest1 = filmDbStorage.getFilm(5);
-        assertEquals("film1_test_name", filmTest1.getName(), "name добавленного фильма не совпадает.");
-        //получаем фильм с неизвестным id
-        assertThrows(FilmNotFoundException.class, () -> filmDbStorage.getFilm(9999));
-        //обновление фильма с несуществующим id
-        assertThrows(FilmNotFoundException.class, () -> filmDbStorage.updateFilm(filmUpdateUnknown));
-        //обновление фильма с корректным id
-        Film filmTestUpdate = filmDbStorage.updateFilm(filmUpdateCorrect);
-        assertEquals("film1_test_name_update", filmTestUpdate.getName());
-        //удаление фильма с несуществующим id
-        assertThrows(FilmNotFoundException.class, () -> filmDbStorage.deleteFilm(9999));
-        //удаление фильма с корректным id
-        filmDbStorage.deleteFilm(5);
-        assertThrows(FilmNotFoundException.class, () -> filmDbStorage.getFilm(5));
-        //получение списка фильмов
-        List<Film> films = filmDbStorage.getFilms();
-        assertEquals(4, films.size(), "Количество фильмов не совпадает.");
-        assertEquals("Interstellar", films.get(0).getName(), "name фильма с id=1 не совпадает.");
-        assertEquals("The Green Mile", films.get(1).getName(), "name фильма с id=2 не совпадает.");
-        assertEquals("Back to the Future", films.get(2).getName(), "name фильма с id=3 не совпадает.");
-        assertEquals("The Lion King", films.get(3).getName(), "name фильма с id=4 не совпадает.");
+    public void updateUser() {
+        User updatedUser = User.builder()
+                .name("newname")
+                .login("newlogin")
+                .email("newemail@mail.ru")
+                .birthday(LocalDate.of(1999, 1, 11))
+                .id(1L)
+                .build();
+
+        Optional<User> actual = Optional.of(userController.updateUser(updatedUser));
+
+        assertThat(actual)
+                .isPresent()
+                .hasValueSatisfying(u ->
+                        assertThat(u).hasFieldOrPropertyWithValue("name", "newname")
+                                .hasFieldOrPropertyWithValue("login", "newlogin")
+                                .hasFieldOrPropertyWithValue("email", "newemail@mail.ru")
+                                .hasFieldOrPropertyWithValue("birthday", LocalDate.of(1999, 1, 11))
+                                .hasFieldOrPropertyWithValue("id", 1L));
     }
 
     @Test
-    public void testCrudFilmLike() {
-        //самые популярные фильмы
-        List<Film> popularFilms = filmDbStorage.getPopularFilms(5);
-        assertEquals(4, popularFilms.size(), "Количество популярных фильмов не совпадает.");
-        assertEquals(2, popularFilms.get(0).getId(), "Самый популярный фильм не совпадает.");
-        assertEquals(4, popularFilms.get(3).getId(), "Самый НЕ популярный фильм не совпадает.");
-        //добавляем лайк фильму с несуществующим id
-        assertThrows(FilmNotFoundException.class, () -> filmLikeDao.addLike(9999, 1));
-        //добавляем лайк фильму с корректным id
-        filmLikeDao.addLike(1, 1);
-        filmLikeDao.addLike(1, 3);
-        popularFilms = filmDbStorage.getPopularFilms(1);
-        assertEquals(1, popularFilms.get(0).getId(), "Самый популярный фильм не совпадает.");
-        //удаляем лайк фильму с несуществующим id
-        assertThrows(FilmNotFoundException.class, () -> filmLikeDao.deleteLike(9999, 1));
-        //удаляем лайк фильму с корректным id
-        filmLikeDao.deleteLike(1, 1);
-        filmLikeDao.deleteLike(1, 3);
-        popularFilms = filmDbStorage.getPopularFilms(1);
-        assertEquals(2, popularFilms.get(0).getId(), "Самый популярный фильм не совпадает.");
+    public void updateInvalidUser() {
+        assertThrows(ValidationException.class, () -> userController.updateUser(User.builder()
+                .id(1L)
+                .name(" ")
+                .login(" ")
+                .email("mail@mail.ru")
+                .birthday(LocalDate.of(2000, 1, 1))
+                .build()), "testing user update invalid name");
+
+        assertThrows(ValidationException.class, () -> userController.updateUser(User.builder()
+                .id(1L)
+                .name("name")
+                .login("login")
+                .email(" ")
+                .birthday(LocalDate.of(2000, 1, 1))
+                .build()), "testing user update invalid email");
+
+        assertThrows(ValidationException.class, () -> userController.updateUser(User.builder()
+                .id(1L)
+                .name("name")
+                .login("login")
+                .email("mail@mail.ru")
+                .birthday(LocalDate.of(2200, 1, 1))
+                .build()), "testing user update invalid birthday");
     }
 
     @Test
-    public void testMpa() {
-        //получаем список всех рейтингов MPA
-        List<MPA> ratings = mpaDbStorage.getRatings();
-        assertEquals(5, ratings.size(), "Количество известный рейтингов MPA не совпадает.");
-        //получаем рейтинг MPA по некорректному id
-        assertThrows(MpaNotFoundException.class, () -> mpaDbStorage.getRating(9999));
-        //получаем рейтинг MPA по корректному id
-        MPA rating = mpaDbStorage.getRating(1);
-        assertNotNull(rating, "Ретинг MPA должен существовать.");
-        assertEquals("G", rating.getName(), "Название рейтинга с id=1 не совпадает.");
+    public void updateUnknownUser() {
+        assertThrows(NotFoundException.class, () -> userController.updateUser(User.builder()
+                .id(9999L)
+                .name("name")
+                .login("login")
+                .email("mail@mail.ru")
+                .birthday(LocalDate.of(2000, 1, 1))
+                .build()), "testing user update unknown");
     }
 
     @Test
-    public void testGenres() {
-        //добавить фильму жанр c некорректным id жанра
-        assertThrows(GenreNotFoundException.class, () -> genreDbStorage.addFilmGenre(1,9999));
-        //добавить фильму жанр c некорректным id фильма
-        assertThrows(GenreNotFoundException.class, () -> genreDbStorage.addFilmGenre(9999,4));
-        //добавить фильму жанр с корректными id addFilmGenre
-        genreDbStorage.addFilmGenre(1,4);
-        List<Genre> genres=genreDbStorage.getGengesFilm(1);
-        assertNotNull(genres,"Жанры для фильма с id=1 отсутствуют.");
-        assertEquals(2,genres.size(),"Количество жанров для фильма с id=1 не совпадает.");
+    public void getAllUsers() {
 
-        //удалить у фильма жанры с корректным id фильма
-        genreDbStorage.delFilmGenre(1);
-        genres=genreDbStorage.getGengesFilm(1);
-        assertEquals(0,genres.size(),"Жанры для фильма с id=1 должны отсутствовать.");
+        User userOne = userController.getUser(1L);
+        User userTwo = userController.addUser(createNewUser());
 
+        List<User> users = userController.getUsers();
 
-        //получить жанр по НЕ корректному id
-        assertThrows(GenreNotFoundException.class, () -> genreDbStorage.getGenge(9999));
-        //получить жанр по корректному id
-        Genre genre1 = genreDbStorage.getGenge(1);
-        Genre genre5 = genreDbStorage.getGenge(5);
-        assertNotNull(genre1, "Жанр с id=1 должен существовать.");
-        assertNotNull(genre5, "Жанр с id=5 должен существовать.");
-        assertEquals("Комедия", genre1.getName(), "Название жанра с id=1 не совпадает.");
-        assertEquals("Документальный", genre5.getName(), "Название жанра с id=1 не совпадает.");
-        //получить жанры по filmId
-        List<Genre> genresFilm1 = genreDbStorage.getGengesFilm(2);
-        assertEquals("Драма", genresFilm1.get(0).getName(), "Жанры фильм с id=2 не совпадают.");
-        assertEquals("Триллер", genresFilm1.get(1).getName(), "Жанры фильм с id=2 не совпадают.");
-        //получить все жанры
-        genres = genreDbStorage.getGenresFilms();
-        assertNotNull(genres, "Список фильмов пустой.");
-        assertEquals(6, genres.size(), "Количество фильмов не совпадает.");
-        assertEquals("Комедия", genres.get(0).getName(), "Название жанра с id=1 не совпадает.");
-        assertEquals("Боевик", genres.get(5).getName(), "Название жанра с id=5 не совпадает.");
+        assertThat(users).contains(userOne, userTwo);
     }
+
+    @Test
+    public void addFriend() {
+        User userTwo = userController.addUser(createNewUser());
+
+        userController.addFriend(1L, 2L);
+
+        assertThat(userController.getUserFriends(1L)).contains(userTwo);
+    }
+
+    @Test
+    public void removeFriend() {
+        userController.addUser(createNewUser());
+        userController.addFriend(1L, 2L);
+
+        userController.removeFriend(1L, 2L);
+
+        assertThat(userController.getUserFriends(1L)).isEmpty();
+    }
+
+    @Test
+    public void getAllFriends() {
+        User friendOne = userController.addUser(createNewUser());
+        User friendTwo = userController.addUser(createNewUser());
+
+        userController.addFriend(1L, 2L);
+        userController.addFriend(1L, 3L);
+
+        assertThat(userController.getUserFriends(1L)).contains(friendOne, friendTwo);
+    }
+
+    @Test
+    public void getMutualFriends() {
+        userController.addUser(createNewUser());
+        User mutualFriend = userController.addUser(createNewUser());
+
+        userController.addFriend(1L, 3L);
+        userController.addFriend(2L, 3L);
+
+        assertThat(userController.getMutualFriends(1L, 2L)).contains(mutualFriend);
+    }
+
+
+    // Film tests
+    @Test
+    public void getFilmById() {
+        Optional<Film> filmOptional = Optional.of(filmController.getFilm(1L));
+
+        assertThat(filmOptional)
+                .isPresent()
+                .hasValueSatisfying(film ->
+                        assertThat(film).hasFieldOrPropertyWithValue("id", 1L)
+                );
+    }
+
+    @Test
+    public void addFilm() {
+        filmController.addFilm(createNewFilm());
+
+        assertThat(Optional.of(filmController.getFilm(2L)))
+                .isPresent()
+                .hasValueSatisfying(film ->
+                        assertThat(film).hasFieldOrPropertyWithValue("id", 2L)
+                );
+    }
+
+    @Test
+    public void updateFilm() {
+        Film updatedFilm = Film.builder()
+                .name("updated film")
+                .description("updated description")
+                .duration(200)
+                .releaseDate(LocalDate.of(1999, 11, 1))
+                .mpa(ratingController.getMpa(2L))
+                .genres(List.of(genreController.getGenre(2L)))
+                .id(1L)
+                .build();
+
+        Optional<Film> actual = Optional.of(filmController.updateFilm(updatedFilm));
+
+        assertThat(actual)
+                .isPresent()
+                .hasValueSatisfying(u ->
+                        assertThat(u).hasFieldOrPropertyWithValue("name", "updated film")
+                                .hasFieldOrPropertyWithValue("description", "updated description")
+                                .hasFieldOrPropertyWithValue("duration", 200)
+                                .hasFieldOrPropertyWithValue("releaseDate", LocalDate.of(1999, 11, 1))
+                                .hasFieldOrPropertyWithValue("id", 1L));
+    }
+
+    @Test
+    public void updateInvalidFilm() {
+        assertThrows(ValidationException.class, () -> filmController.updateFilm(Film.builder()
+                .name("updated film")
+                .description("updated description")
+                .duration(200)
+                .releaseDate(LocalDate.of(1000, 11, 1))
+                .mpa(ratingController.getMpa(2L))
+                .genres(List.of(genreController.getGenre(2L)))
+                .id(1L)
+                .build()), "wrong release date");
+
+        assertThrows(ValidationException.class, () -> filmController.updateFilm(Film.builder()
+                .name("")
+                .description("updated description")
+                .duration(200)
+                .releaseDate(LocalDate.of(1999, 11, 1))
+                .mpa(ratingController.getMpa(2L))
+                .genres(List.of(genreController.getGenre(2L)))
+                .id(1L)
+                .build()), "empty name");
+
+        assertThrows(NotFoundException.class, () -> filmController.updateFilm(Film.builder()
+                .name("updated film")
+                .description("updated description")
+                .duration(200)
+                .releaseDate(LocalDate.of(1999, 11, 1))
+                .mpa(ratingController.getMpa(9999L))
+                .genres(List.of(genreController.getGenre(2L)))
+                .id(1L)
+                .build()), "unknown rating");
+
+        assertThrows(NotFoundException.class, () -> filmController.updateFilm(Film.builder()
+                .name("updated film")
+                .description("updated description")
+                .duration(200)
+                .releaseDate(LocalDate.of(1999, 11, 1))
+                .mpa(ratingController.getMpa(2L))
+                .genres(List.of(genreController.getGenre(9999L)))
+                .id(1L)
+                .build()), "unknown genre");
+    }
+
+    @Test
+    public void addLike() {
+        filmController.addLike(1L, 1L);
+
+        assertThat(filmController.getFilmLikes(1L)).contains(1L);
+    }
+
+    @Test
+    public void removeLike() {
+        filmController.addLike(1L, 1L);
+
+        filmController.removeLike(1L, 1L);
+
+        assertThat(filmController.getFilmLikes(1L)).isEmpty();
+    }
+
+    @Test
+    public void getAllFilms() {
+        Film testFilm = filmController.addFilm(createNewFilm());
+
+        List<Film> actual = filmController.getFilms();
+
+        assertThat(actual).isNotEmpty();
+        assertThat(actual).contains(testFilm);
+    }
+
+    @Test
+    public void getPopularFilms() {
+        Film actual = filmController.addFilm(createNewFilm());
+        filmController.addLike(2L, 1L);
+
+        assertEquals(filmController.getPopularFilmGenreIdYear(1, 0, 0).size(), 1, "size popular films");
+        assertEquals(filmController.getPopularFilmGenreIdYear(10, 0, 0).get(0), actual, "most popular film");
+    }
+
+    @Test
+    public void updateUnknownFilm() {
+        assertThrows(NotFoundException.class, () -> filmController.updateFilm(Film.builder()
+                .name("updated film")
+                .description("updated description")
+                .duration(200)
+                .releaseDate(LocalDate.of(1999, 11, 1))
+                .mpa(ratingController.getMpa(2L))
+                .genres(List.of(genreController.getGenre(2L)))
+                .id(9999L)
+                .build()), "unknown film");
+    }
+
+    // genres test
+    @Test
+    public void getAllGenres() {
+        List<Genre> genres = genreController.getAllGenres();
+
+        assertThat(genres).isNotEmpty();
+        assertThat(genres).contains(genreController.getGenre(1L));
+    }
+
+    // mpa ratings test
+    @Test
+    public void getAllMPARatings() {
+        List<Rating> ratings = ratingController.getAllMpa();
+
+        assertThat(ratings).isNotEmpty();
+        assertThat(ratings).contains(ratingController.getMpa(1L));
+    }
+
+
+    private Film createNewFilm() {
+        return Film.builder()
+                .name("new film")
+                .description("new description")
+                .duration(100)
+                .releaseDate(LocalDate.of(2000, 11, 1))
+                .mpa(ratingController.getMpa(1L))
+                .genres(List.of(genreController.getGenre(1L)))
+                .build();
+    }
+
+    private User createNewUser() {
+        return User.builder()
+                .name("user1")
+                .login("login1")
+                .email("email1@ya.ru")
+                .birthday(LocalDate.of(2000, 10, 10))
+                .build();
+    }
+
 
 }
-
